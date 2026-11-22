@@ -1,0 +1,4 @@
+# Optional: the CP-SAT solver for the Thorough optimiser and the solver benchmark.
+# OR-Tools publishes wheels for Python 3.9-3.13; on newer Pythons this install fails and Circadia
+# simply runs without the solver (Thorough falls back to GA + local search).
+ortools>=9.12
