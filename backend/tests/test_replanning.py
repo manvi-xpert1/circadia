@@ -11,7 +11,7 @@ from ai.pipeline import plan, stability_report, verify
 from ai.problem import build_problem
 from ai.tradeoffs import annotate, dominates
 from ai.types import Commitment, PlanRequest, Preferences
-from ai.uncertainty import MCConfig, simulate_plan
+from ai.uncertainty import MCConfig, replay, simulate_plan, task_draws
 from ai.whatif import simulate
 
 from .helpers import NOW, random_request, task
@@ -108,12 +108,50 @@ def test_monte_carlo_is_reproducible_and_bounded():
     p, starts = _plan_starts()
     a = simulate_plan(p, starts, MCConfig(runs=200, seed=1))
     b = simulate_plan(p, starts, MCConfig(runs=200, seed=1))
+    a.pop("seconds"), b.pop("seconds")
     assert a == b
     for k in ("p_all_important_done", "p_all_deadlines_met", "deadline_safety", "p_overrun_any_day"):
         assert a[k] is None or 0 <= a[k] <= 1
     assert 0 <= a["expected_completed"] <= a["planned"]
     assert a["completed_p10"] <= a["expected_completed"] <= a["completed_p90"] + 1e-9
     assert a["runs"] == 200
+
+
+def test_monte_carlo_reports_standard_errors_that_shrink_with_runs():
+    p, starts = _plan_starts()
+    quick = simulate_plan(p, starts, MCConfig.tier("quick", seed=3))
+    research = simulate_plan(p, starts, MCConfig.tier("research", seed=3))
+    assert quick["runs"] == 30 and research["runs"] == 300
+    assert research["se"]["expected_completed"] < quick["se"]["expected_completed"]
+    assert research["seconds"] >= 0
+
+
+def test_unknown_tier_is_rejected():
+    with pytest.raises(ValueError):
+        MCConfig.tier("huge")
+
+
+def test_adaptive_stops_at_target_or_cap():
+    p, starts = _plan_starts()
+    loose = simulate_plan(p, starts, MCConfig(adaptive=True, target_se=10.0, seed=1))
+    assert loose["runs"] == 30 and loose["stopped"] == "target"
+    strict = simulate_plan(p, starts, MCConfig(adaptive=True, target_se=1e-9, max_runs=120, seed=1))
+    assert strict["runs"] == 120 and strict["stopped"] == "cap"
+
+
+def test_common_random_numbers_are_keyed_by_task():
+    """Run r of task i gets the same draw whatever the run count, so plans are compared fairly."""
+    p, _ = _plan_starts()
+    u30, z30 = task_draws(p, 30, 5)
+    u300, z300 = task_draws(p, 300, 5)
+    assert np.array_equal(u30, u300[:30]) and np.array_equal(z30, z300[:30])
+
+
+def test_identical_plans_have_identical_replays():
+    p, starts = _plan_starts()
+    u, z = task_draws(p, 50, 9)
+    a, b = replay(p, starts, u, z), replay(p, list(starts), u, z)
+    assert np.array_equal(a["done"], b["done"])
 
 
 def test_monte_carlo_of_an_empty_plan():
@@ -165,4 +203,4 @@ def test_annotate_marks_a_strictly_worse_plan_as_dominated():
     annotate(plans)
     assert base["tradeoffs"]["pareto_optimal"] and not worse["tradeoffs"]["pareto_optimal"]
     assert worse["tradeoffs"]["dominated_by"] == ["A"]
-    assert "Energy fit" in base["tradeoffs"]["best_at"]
+    assert "Blocks likely to happen" in base["tradeoffs"]["best_at"]

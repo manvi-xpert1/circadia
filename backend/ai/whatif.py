@@ -12,7 +12,7 @@ import statistics
 from dataclasses import replace
 from datetime import datetime, timedelta
 
-from .fuzzy.profile import learn_profile, state_for_day
+from .probability.energy_profile import learn_profile, state_for_day
 from .pipeline import plan
 from .types import CheckIn, Commitment, PlanRequest, TaskIn
 
@@ -143,7 +143,7 @@ def explain(notes: list[str], before: dict, after: dict, diff: dict) -> list[str
     cap_b = statistics.fmean(before["days"][0]["capacity"])
     cap_a = statistics.fmean(after["days"][0]["capacity"])
     if abs(cap_a - cap_b) >= 0.05:
-        lines.append(f"Your expected mental capacity today averages {cap_a:.1f}/10 instead of {cap_b:.1f}.")
+        lines.append(f"Your expected mental energy today averages {cap_a:.1f}/10 instead of {cap_b:.1f}.")
     later = [m for m in diff["moved"] if m["to_day"] > m["from_day"]]
     if diff["moved"]:
         lines.append(

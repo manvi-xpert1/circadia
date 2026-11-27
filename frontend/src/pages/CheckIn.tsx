@@ -105,7 +105,7 @@ export function CheckInPage() {
     <>
       <PageHeader
         title="Energy check-in"
-        sub="Twenty seconds. The fuzzy engine turns these into your expected capacity for every time slot."
+        sub="Twenty seconds. The planner turns these into your expected energy for every time slot."
         actions={!doneToday && (
           <Button variant="ghost" onClick={() => { toast({ text: "Skipped. Today uses your recent average instead." }); nav("/schedule"); }}>
             Skip today

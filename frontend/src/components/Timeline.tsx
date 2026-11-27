@@ -2,7 +2,7 @@ import clsx from "clsx";
 import { CheckCircle2, CircleSlash, Lock, PieChart } from "lucide-react";
 import type { Block, DayInfo, PlanRun } from "../api/types";
 import { hm } from "../lib/format";
-import { Badge, fitTone } from "./ui";
+import { Badge, fitBar, fitTone } from "./ui";
 
 const HOUR_PX = 60;
 const toMin = (hhmm: string) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
@@ -18,7 +18,7 @@ function OutcomeIcon({ b }: { b: Block }) {
   return <Icon size={15} className={s === "skipped" ? "text-muted" : "text-teal"} aria-label={`Outcome: ${s}`} />;
 }
 
-/** Capacity 3.5 or lower is pale; 8 or higher is full teal. */
+/** Expected mental energy 3.5 or lower is pale; 8 or higher is full teal. */
 function ribbonGradient(cap: number[]): string {
   const n = cap.length;
   const stops = cap.flatMap((c, i) => {
@@ -29,8 +29,8 @@ function ribbonGradient(cap: number[]): string {
 }
 
 /**
- * One day: hour rail, the energy ribbon (expected mental capacity per 15-minute
- * slot from the fuzzy engine), busy times and planned blocks.
+ * One day: hour rail, the energy ribbon (expected mental energy per 15-minute
+ * slot, from the check-in and the learned time-of-day profile), busy times and planned blocks.
  */
 export function DayTimeline({
   run, day, blocks, selected, onSelect,
@@ -60,7 +60,7 @@ export function DayTimeline({
       <div
         className="relative mr-3 w-3 shrink-0 rounded-full bg-beige"
         role="img"
-        aria-label={`Expected mental capacity through the day, ${day.energy_source === "forecast" ? "forecast" : "from your check-in"}: from ${Math.min(...day.capacity).toFixed(1)} to ${Math.max(...day.capacity).toFixed(1)} out of 10`}
+        aria-label={`Expected mental energy through the day, ${day.energy_source === "forecast" ? "forecast" : "from your check-in"}: from ${Math.min(...day.capacity).toFixed(1)} to ${Math.max(...day.capacity).toFixed(1)} out of 10`}
         style={{ height, background: ribbonGradient(day.capacity) }}
       />
 
@@ -91,7 +91,7 @@ export function DayTimeline({
               key={b.block_id}
               onClick={() => onSelect(b.block_id)}
               aria-pressed={isSel}
-              aria-label={`${b.title}, ${hm(b.start)} to ${hm(b.end)}${b.fit_label ? `, ${b.fit_label} energy fit` : ""}`}
+              aria-label={`${b.title}, ${hm(b.start)} to ${hm(b.end)}${b.fit_label ? `, ${b.fit_label.toLowerCase()} to happen` : ""}`}
               className={clsx(
                 "absolute left-0 right-0 overflow-hidden rounded-lg border text-left transition-shadow",
                 ai ? "bg-surface" : "bg-beige/80",
@@ -101,14 +101,14 @@ export function DayTimeline({
               style={{ top: top(s) + 1, height: h }}
             >
               <div className={clsx("absolute inset-y-0 left-0 w-1",
-                ai ? (b.fit_label === "Excellent" ? "bg-teal" : b.fit_label === "Good" ? "bg-sage" : b.fit_label === "Fair" ? "bg-warn" : "bg-danger") : "bg-brown")} />
+                ai ? fitBar(b.fit_label) : "bg-brown")} />
               <div className={clsx("flex h-full flex-col gap-0.5 pl-3.5 pr-2", h < 34 ? "justify-center py-0" : "justify-start py-1.5")}>
                 <div className="flex items-center gap-1.5">
                   <span className={clsx("truncate font-medium", h < 34 ? "text-[12.5px]" : "text-[13.5px]")}>{b.title}</span>
                   {h < 48 && <span className="num shrink-0 text-[12px] text-muted">{hm(b.start)}</span>}
                   {b.locked && <Lock size={12} className="shrink-0 text-muted" aria-label="Locked" />}
                   <OutcomeIcon b={b} />
-                  {ai && b.fit_label && h >= 34 && <Badge tone={fitTone(b.fit_label)} className="ml-auto">{b.fit_label} fit</Badge>}
+                  {ai && b.fit_label && h >= 34 && <Badge tone={fitTone(b.fit_label)} className="ml-auto">{b.fit_label}</Badge>}
                 </div>
                 {h >= 48 && (
                   <span className="num text-[12px] text-muted">
@@ -162,7 +162,7 @@ export function HorizonView({
                   "b" in x && x.b ? (
                     <li key={`b${x.b.block_id}`}>
                       <button type="button" onClick={() => onPick(d.day, x.b!.block_id)} className="flex w-full items-center gap-2 rounded-md px-1.5 py-1 text-left hover:bg-teal-tint/40">
-                        <span className={clsx("h-6 w-1 shrink-0 rounded-full", x.b.kind !== "ai" ? "bg-brown" : x.b.fit_label === "Excellent" ? "bg-teal" : x.b.fit_label === "Good" ? "bg-sage" : "bg-warn")} />
+                        <span className={clsx("h-6 w-1 shrink-0 rounded-full", x.b.kind !== "ai" ? "bg-brown" : fitBar(x.b.fit_label))} />
                         <span className="num w-11 shrink-0 text-[12px] text-muted">{hm(x.b.start)}</span>
                         <span className="truncate text-[13px]">{x.b.title}</span>
                       </button>

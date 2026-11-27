@@ -80,7 +80,8 @@ def test_generate_explain_move_lock_and_outcome(auth):
     main = plan["plans"][0]
     assert main["is_active"] and main["blocks"]
     blk = main["blocks"][0]
-    assert blk["verdict"] and blk["fired_rules"] and blk["duration"]["text"]
+    assert blk["verdict"] and 0 < blk["happens"]["p"] < 1 and isinstance(blk["factors"], list) and blk["duration"]["text"]
+    assert blk["context"]["start"] == blk["start"]  # saved so the outcome can train the completion model
     # Current returns the same run.
     assert auth.get("/api/schedules/current").json()["run_id"] == plan["run_id"]
     # Lock it.
@@ -247,3 +248,31 @@ def test_old_database_gets_new_columns(tmp_path):
     init_db(make_engine(path))
     cols = {r[1] for r in sqlite3.connect(path).execute("PRAGMA table_info(tasks)")}
     assert {"recur_days", "recur_until", "parent_id", "occurrence_date"} <= cols
+
+
+def test_pilot_export_is_anonymous_and_scores_predictions(auth):
+    auth.post("/api/tasks", json=task_body(title="Secret thesis chapter", notes="private"))
+    blk = auth.post("/api/schedules/generate", json={}).json()["plans"][0]["blocks"][0]
+    auth.post(f"/api/blocks/{blk['block_id']}/outcome", json={"status": "done", "actual_minutes": 70})
+    r = auth.get("/api/data/pilot")
+    assert r.status_code == 200
+    out = r.json()
+    text = r.text.lower()
+    assert "secret" not in text and "private" not in text and "manvi" not in text
+    row = out["outcomes"][0]
+    assert row["status"] == "done" and row["predicted_p"] == blk["happens"]["p"]
+    assert row["context"]["mental_demand"] == blk["context"]["mental_demand"]
+    assert out["calibration"]["n"] == 1 and not out["calibration"]["enough_data"]
+    assert len(out["pilot_id"]) == 12 and auth.get("/api/data/pilot").json()["pilot_id"] != out["pilot_id"]
+
+
+def test_simulation_tier_is_a_preference(auth):
+    prefs = auth.get("/api/preferences").json()
+    assert prefs["simulation"] == "standard" and prefs["block_quantile"] == 0.65
+    prefs["simulation"] = "quick"
+    assert auth.put("/api/preferences", json=prefs).status_code == 200
+    auth.post("/api/tasks", json=task_body())
+    plan = auth.post("/api/schedules/generate", json={}).json()
+    assert plan["meta"]["simulation"]["runs"] == 30
+    prefs["simulation"] = "huge"
+    assert auth.put("/api/preferences", json=prefs).status_code == 422

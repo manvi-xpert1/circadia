@@ -100,7 +100,7 @@ def test_rank_biserial():
 def test_experiment_counts_solver_results_and_runs_ablations():
     r = run_experiment(EvalConfig(users=2, days=2, include_cpsat=True, cpsat_seconds=0.5, ablations=True,
                                   compare_horizon=False))
-    assert {"hybrid", "cpsat", "abl_no_fuzzy", "abl_no_prob", "abl_v1_durations"} <= set(r["schedulers"])
+    assert {"hybrid", "cpsat", "abl_no_context", "abl_no_prob", "abl_v1_durations"} <= set(r["schedulers"])
     for n in r["schedulers"]:
         assert r["summary"][n]["plan_violations"]["mean"] == 0
         assert "solver_fallbacks" in r["summary"][n]

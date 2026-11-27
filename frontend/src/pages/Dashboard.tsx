@@ -6,7 +6,7 @@ import { api } from "../api/client";
 import { useCheckins, usePlan, useRefreshAll, useTasks } from "../api/hooks";
 import type { User } from "../api/types";
 import { TaskForm } from "../components/TaskForm";
-import { Badge, Button, Card, EmptyState, ErrorState, fitTone, Modal, PageHeader, SectionTitle, Skeleton, useToast } from "../components/ui";
+import { Badge, Button, Card, EmptyState, ErrorState, fitBar, fitTone, Modal, PageHeader, SectionTitle, Skeleton, useToast } from "../components/ui";
 import { greeting, hm, minutes, relDeadline } from "../lib/format";
 import { CheckInForm } from "./CheckIn";
 
@@ -70,7 +70,7 @@ export function Dashboard({ user }: { user: User }) {
                   <h2 className="mt-1 text-[28px] font-light leading-tight tracking-[-0.01em]">{next.title}</h2>
                   <div className="mt-2 flex flex-wrap items-center gap-2">
                     <span className="num text-[14px] text-muted">{hm(next.start)}–{hm(next.end)}</span>
-                    {next.fit_label && <Badge tone={fitTone(next.fit_label)}>{next.fit_label} energy fit</Badge>}
+                    {next.fit_label && <Badge tone={fitTone(next.fit_label)}>{next.fit_label} to happen</Badge>}
                     {next.deadline && <Badge tone="brown">Due {relDeadline(next.deadline)}</Badge>}
                   </div>
                   {next.verdict && <p className="mt-4 max-w-prose text-[15px] leading-relaxed text-ink/90">{next.verdict}</p>}
@@ -98,7 +98,7 @@ export function Dashboard({ user }: { user: User }) {
                 {today.map((b) => (
                   <li key={b.block_id} className={clsx("flex items-center gap-3 rounded-lg px-2 py-2", b === next && "bg-teal-tint/50")}>
                     <span className="num w-24 shrink-0 text-[13px] text-muted">{hm(b.start)}–{hm(b.end)}</span>
-                    <span className={clsx("h-2 w-2 shrink-0 rounded-full", b.kind !== "ai" ? "bg-brown" : b.fit_label === "Excellent" ? "bg-teal" : b.fit_label === "Good" ? "bg-sage" : "bg-warn")} aria-hidden />
+                    <span className={clsx("h-2 w-2 shrink-0 rounded-full", b.kind !== "ai" ? "bg-brown" : fitBar(b.fit_label))} aria-hidden />
                     <span className={clsx("flex-1 truncate", b.outcome && "text-muted line-through")}>{b.title}</span>
                     {b.outcome && <CheckCircle2 size={16} className="text-teal" aria-label={`Recorded: ${b.outcome.status}`} />}
                     {b.planned_minutes && <span className="num text-[12.5px] text-muted">{minutes(b.planned_minutes)}</span>}

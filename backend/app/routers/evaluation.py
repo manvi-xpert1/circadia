@@ -31,6 +31,8 @@ class RunIn(BaseModel):
     difficulty: Literal["easy", "moderate", "tight"] = "moderate"
     include_cpsat: bool = False  # adds about 2 s per plan
     ablations: bool = False
+    selection: bool = False  # outcome-based plan selection vs fitness-best (about 4x a hybrid run)
+    buffers: bool = False  # P50 / P65 / shared-buffer policies
     # Extra studies, run after the main comparison.
     calibration: bool = True  # duration models v1 vs v2 (fast)
     stability: bool = False  # replanning at several stability levels
@@ -95,7 +97,8 @@ def start(body: RunIn, user: User = Depends(current_user), db: Session = Depends
     if db.scalar(select(EvaluationRun).where(EvaluationRun.user_id == user.id, EvaluationRun.status == "running")):
         raise HTTPException(409, {"code": "BUSY", "message": "An experiment is already running. Wait for it to finish."})
     cfg = EvalConfig(users=body.users, days=body.days, horizon=body.horizon, seed=body.seed, compare_horizon=body.compare_horizon,
-                     difficulty=body.difficulty, include_cpsat=body.include_cpsat, ablations=body.ablations)
+                     difficulty=body.difficulty, include_cpsat=body.include_cpsat, ablations=body.ablations,
+                     selection=body.selection, buffers=body.buffers)
     r = EvaluationRun(user_id=user.id, config_json=body.model_dump())
     db.add(r)
     db.commit()

@@ -9,6 +9,7 @@ from ..db import get_db
 from ..models import Commitment, EnergyCheckIn, Feedback, ScheduleVersion, Task, TaskOutcome, User
 from ..security import current_user
 from ..services.demo import clear_source, counts, load_demo
+from ..services.pilot import pilot_export
 
 router = APIRouter(prefix="/api/data", tags=["data"])
 
@@ -54,3 +55,9 @@ def export(user: User = Depends(current_user), db: Session = Depends(get_db)):
         "schedule_versions": [{k: v for k, v in x.items() if k not in ("meta_json",)} for x in versions],
         "feedback": fb,
     }
+
+
+@router.get("/pilot")
+def pilot(include_demo: bool = False, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Anonymised outcomes and a calibration check, for pooling across pilot users."""
+    return pilot_export(db, user, include_demo)

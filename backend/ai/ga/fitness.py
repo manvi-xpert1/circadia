@@ -109,7 +109,7 @@ def evaluate(p: Problem, starts: list[int], lengths: list[int], preset: str = "b
     s_pri = sum(weights[i] * DAY_DISCOUNT ** p.day_of(starts[i]) for i in sched) / w_all
     if sched:
         s_en = sum(weights[i] * p.block_fit(i, starts[i], lengths[i]) for i in sched) / w_sched
-        s_dur = sum(weights[i] * tasks[i].p_complete for i in sched) / w_sched
+        s_dur = sum(weights[i] * tasks[i].p_fits for i in sched) / w_sched  # "happens" lives in s_en
     else:
         s_en = s_dur = 0.0
     due = [ti.idx for ti in tasks if ti.dl_end < p.G]

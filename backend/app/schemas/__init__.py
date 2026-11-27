@@ -161,6 +161,18 @@ class PreferencesIO(BaseModel):
     horizon_days: int = Field(ge=1, le=7)
     optimizer: Literal["ga", "hybrid", "cpsat"] = "hybrid"
     replan_stability: float = Field(default=0.5, ge=0, le=1)
+    simulation: Literal["quick", "standard", "research", "adaptive"] = "standard"
+    block_quantile: float = Field(default=0.65, ge=0.5, le=0.9)
+
+    @field_validator("simulation", mode="before")
+    @classmethod
+    def default_simulation(cls, v):
+        return v or "standard"  # rows saved before this setting existed
+
+    @field_validator("block_quantile", mode="before")
+    @classmethod
+    def default_quantile(cls, v):
+        return 0.65 if v is None else v
 
     @model_validator(mode="after")
     def check_window(self):

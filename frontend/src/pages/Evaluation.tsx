@@ -11,10 +11,12 @@ const TEAL = "#1F6F6B";
 const GREY = "#A3AAA4";
 const AXIS = { fontSize: 11, fill: "#5B6660" };
 const TIP = { borderRadius: 10, border: "1px solid #E4DCCB", background: "rgba(255,253,248,.96)", fontSize: 13 };
-const MAIN_ALL = ["priority", "duration", "fuzzy", "ga", "hybrid", "cpsat"];
+// "fuzzy" and "abl_no_fuzzy" appear only in runs saved before the completion model replaced the fuzzy score.
+const MAIN_ALL = ["priority", "duration", "energy", "fuzzy", "ga", "hybrid", "cpsat"];
 const SHORT: Record<string, string> = {
-  priority: "Priority", duration: "Duration", fuzzy: "Fuzzy", ga: "GA", hybrid: "GA+LS", cpsat: "CP-SAT", ga_1day: "GA 1-day",
-  abl_no_fuzzy: "No fuzzy", abl_no_prob: "No P80", abl_v1_durations: "Old durations",
+  priority: "Priority", duration: "Duration", energy: "Energy", fuzzy: "Fuzzy", ga: "GA", hybrid: "GA+LS", cpsat: "CP-SAT", ga_1day: "GA 1-day",
+  abl_no_context: "No context", abl_no_fuzzy: "No fuzzy", abl_fuzzy: "Fuzzy score", abl_no_prob: "No P80", abl_v1_durations: "Old durations",
+  hybrid_select: "Outcome pick", buf_p50: "P50", buf_p65: "P65", buf_p50_shared: "P50+15%", buf_p65_shared: "P65+10%",
 };
 const KEY = ["completed_per_day", "deadline_violation_rate", "energy_fit", "overloaded_days", "overload_minutes"];
 const pfmt = (p: number | null | undefined) => (p == null ? "–" : p < 0.001 ? "<0.001" : p.toFixed(3));
@@ -25,7 +27,7 @@ export function EvaluationPage() {
   const [selected, setSelected] = useState<number | null>(null);
   const [cfg, setCfg] = useState<EvalConfigIn>({
     users: 10, days: 7, horizon: 3, seed: 2026, compare_horizon: true, difficulty: "moderate",
-    include_cpsat: false, ablations: false, calibration: true, stability: false, solver_benchmark: false,
+    include_cpsat: false, ablations: false, selection: false, buffers: false, calibration: true, stability: false, solver_benchmark: false,
   });
   const current = selected ?? runs.data?.[0]?.id ?? null;
   const run = useQuery({
@@ -45,7 +47,7 @@ export function EvaluationPage() {
     mutationFn: (id: number) => api(`/api/evaluation/runs/${id}`, { method: "DELETE" }),
     onSuccess: () => { setSelected(null); qc.invalidateQueries({ queryKey: ["eval-runs"] }); },
   });
-  const perUserDay = 0.75 + (cfg.compare_horizon ? 0.15 : 0) + (cfg.ablations ? 0.6 : 0) + (cfg.include_cpsat ? 4.2 : 0);
+  const perUserDay = 0.75 + (cfg.compare_horizon ? 0.15 : 0) + (cfg.ablations ? 0.8 : 0) + (cfg.selection ? 0.9 : 0) + (cfg.buffers ? 0.8 : 0) + (cfg.include_cpsat ? 4.2 : 0);
   const estimate = Math.round(cfg.users * cfg.days * perUserDay * (cfg.difficulty === "tight" ? 1.5 : cfg.difficulty === "easy" ? 0.7 : 1)
     + (cfg.calibration ? 3 : 0) + (cfg.stability ? 90 : 0) + (cfg.solver_benchmark ? 240 : 0));
   const busy = run.data?.status === "running" || start.isPending;
@@ -74,6 +76,8 @@ export function EvaluationPage() {
               ["compare_horizon", "Also run the GA with a 1-day horizon"],
               ["include_cpsat", "Include the CP-SAT solver (2 s per plan)"],
               ["ablations", "Ablations: remove one component at a time"],
+              ["selection", "Pick the main plan by simulated outcome"],
+              ["buffers", "Buffer policies: P50, P65, shared daily slack"],
               ["calibration", "Duration model calibration study"],
               ["stability", "Replanning stability study"],
               ["solver_benchmark", "Solver benchmark by problem size (slow)"],
@@ -146,6 +150,8 @@ function Results({ run, res, onDelete }: { run: EvalRun; res: EvalResults; onDel
   const keyCharts = ["completed_per_day", "deadline_violation_rate", "energy_fit", "overloaded_days"];
   const curve = res.learning_curve.priority.map((_, d) => ({ day: d + 1, estimate: res.learning_curve.priority[d], model: res.learning_curve[ref][d] }));
   const ablations = names.filter((n) => n.startsWith("abl_"));
+  const policies = names.filter((n) => n === "hybrid_select" || n.startsWith("buf_"));
+  const isMain = (n: string) => !n.startsWith("abl_") && !policies.includes(n);
   const hasHorizon = !!res.summary.ga_1day;
 
   return (
@@ -252,7 +258,7 @@ function Results({ run, res, onDelete }: { run: EvalRun; res: EvalResults; onDel
         <Card>
           <SectionTitle>Reading these results</SectionTitle>
           <ul className="space-y-2 text-[13.5px] leading-relaxed">
-            <li>Each step of the ladder adds one idea: realistic durations (Duration), then energy matching (Fuzzy), then global search with every goal weighed together (GA), then local refinement of the GA's best plan (GA+LS){res.summary.cpsat ? ", with an exact solver as a yardstick (CP-SAT)" : ""}.</li>
+            <li>Each step of the ladder adds one idea: realistic durations (Duration), then energy matching (Energy), then global search with every goal weighed together (GA), then local refinement of the GA's best plan (GA+LS){res.summary.cpsat ? ", with an exact solver as a yardstick (CP-SAT)" : ""}.</li>
             {hasHorizon && (
               <li>
                 Planning 3 days ahead versus 1: deadline violations {fmt(res.summary.ga.deadline_violation_rate.mean, "%")} vs {fmt(res.summary.ga_1day.deadline_violation_rate.mean, "%")},
@@ -266,10 +272,14 @@ function Results({ run, res, onDelete }: { run: EvalRun; res: EvalResults; onDel
         </Card>
       </div>
 
-      {res.comparisons && <Comparisons res={res} ref_={ref} names={names.filter((n) => n !== ref && !n.startsWith("abl_"))} title={`Effect sizes: ${res.schedulers[ref]} against each scheduler`} />}
+      {res.comparisons && <Comparisons res={res} ref_={ref} names={names.filter((n) => n !== ref && isMain(n))} title={`Effect sizes: ${res.schedulers[ref]} against each scheduler`} />}
       {ablations.length > 0 && res.comparisons && (
         <Comparisons res={res} ref_={ref} names={ablations} title="Ablations: what each component contributes"
           note="Each row removes one component from the full system. A positive difference in a higher-is-better measure means the full system is better than the version without that component." />
+      )}
+      {policies.length > 0 && res.comparisons && (
+        <Comparisons res={res} ref_={ref} names={policies} title="Planning policies: selection and buffers"
+          note="Each row changes one planning policy of the full system: choosing the main plan by simulated outcome, or reserving blocks at a lower quantile with or without a shared buffer at the end of each day." />
       )}
       {res.studies && <StudiesView studies={res.studies} />}
 
@@ -290,7 +300,7 @@ function Results({ run, res, onDelete }: { run: EvalRun; res: EvalResults; onDel
             <h3 className="mb-1 font-medium">Hidden truth and assumptions</h3>
             <ul className="list-disc space-y-1 pl-5">
               <li>True overrun per category between 0.9× and 1.6×; a morning or evening chronotype; follow-through 82–95%.</li>
-              <li>True fit is a simple formula on energy shortfall, not the planner's fuzzy rules, so the planner is not graded by its own model.</li>
+              <li>True fit is a simple formula on energy shortfall, not the planner's completion model, so the planner is not graded by its own model.</li>
               <li>A free user starts the next block up to 30 minutes early. Overruns into a lecture pause until it ends. Work past 22:00 stops.</li>
               <li>These are modelling choices. Results show behaviour under these assumptions, not proof of real-world benefit.</li>
             </ul>

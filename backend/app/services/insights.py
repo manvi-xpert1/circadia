@@ -13,11 +13,13 @@ from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ai.fuzzy.profile import BAND_NAMES, band_index
+from ai.probability.energy_profile import BAND_NAMES, band_index
 
 from ..models import EnergyCheckIn, Feedback, ScheduledBlock, ScheduleVersion, Task, TaskOutcome, User
 
-FIT_ORDER = ["Excellent", "Good", "Fair", "Poor"]
+FIT_ORDER = ["Very likely", "Likely", "Uncertain", "Unlikely"]
+# Blocks planned before the completion model carry the old fuzzy labels; group them with the nearest band.
+OLD_FIT_LABELS = {"Excellent": "Very likely", "Good": "Likely", "Fair": "Uncertain", "Poor": "Unlikely"}
 
 
 def _src(model, source: str):
@@ -85,6 +87,7 @@ def compute(db: Session, user: User, source: str = "all") -> dict:
         if not b:
             continue
         label = (b.explanation_json or {}).get("fit_label")
+        label = OLD_FIT_LABELS.get(label, label)
         if label:
             fit_groups[label].append(o.status)
         hour_groups[b.start.hour].append(o.status)

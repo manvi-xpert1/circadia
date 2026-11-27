@@ -1,0 +1,938 @@
+{
+ "config": {
+  "users": 20,
+  "days": 10,
+  "horizon": 3,
+  "seed": 2026,
+  "difficulty": "moderate"
+ },
+ "reference": "hybrid",
+ "schedulers": {
+  "hybrid": "GA + local search",
+  "abl_fuzzy": "Hybrid with fuzzy suitability instead of the completion model",
+  "abl_no_context": "Hybrid without context (completion by category only)"
+ },
+ "summary": {
+  "completion_rate": {
+   "hybrid": 84.831,
+   "abl_fuzzy": 84.442,
+   "abl_no_context": 83.32
+  },
+  "completed_per_day": {
+   "hybrid": 3.8,
+   "abl_fuzzy": 3.835,
+   "abl_no_context": 3.825
+  },
+  "deadline_violation_rate": {
+   "hybrid": 8.055,
+   "abl_fuzzy": 9.016,
+   "abl_no_context": 8.311
+  },
+  "overload_minutes": {
+   "hybrid": 0.076,
+   "abl_fuzzy": 0.0,
+   "abl_no_context": 0.22
+  },
+  "energy_fit": {
+   "hybrid": 0.851,
+   "abl_fuzzy": 0.861,
+   "abl_no_context": 0.841
+  }
+ },
+ "comparisons": {
+  "abl_fuzzy": {
+   "completion_rate": {
+    "diff": 0.389,
+    "ci": [
+     -2.262,
+     3.044
+    ],
+    "p": 0.7562,
+    "effect": 0.086,
+    "p_holm": 0.7562
+   },
+   "completed_per_day": {
+    "diff": -0.035,
+    "ci": [
+     -0.14,
+     0.07
+    ],
+    "p": 0.4997,
+    "effect": -0.191,
+    "p_holm": 0.9994
+   },
+   "deadline_violation_rate": {
+    "diff": -0.962,
+    "ci": [
+     -2.704,
+     0.858
+    ],
+    "p": 0.1977,
+    "effect": -0.329,
+    "p_holm": 0.3954
+   },
+   "overload_minutes": {
+    "diff": 0.076,
+    "ci": [
+     0.0,
+     0.229
+    ],
+    "p": 0.3173,
+    "effect": 1.0,
+    "p_holm": 0.3173
+   },
+   "energy_fit": {
+    "diff": -0.01,
+    "ci": [
+     -0.019,
+     -0.001
+    ],
+    "p": 0.0484,
+    "effect": -0.505,
+    "p_holm": 0.0968
+   }
+  },
+  "abl_no_context": {
+   "completion_rate": {
+    "diff": 1.512,
+    "ci": [
+     -1.377,
+     4.708
+    ],
+    "p": 0.1893,
+    "effect": 0.343,
+    "p_holm": 0.3786
+   },
+   "completed_per_day": {
+    "diff": -0.025,
+    "ci": [
+     -0.135,
+     0.085
+    ],
+    "p": 0.7765,
+    "effect": -0.076,
+    "p_holm": 0.9994
+   },
+   "deadline_violation_rate": {
+    "diff": -0.256,
+    "ci": [
+     -2.066,
+     1.396
+    ],
+    "p": 0.9854,
+    "effect": -0.01,
+    "p_holm": 0.9854
+   },
+   "overload_minutes": {
+    "diff": -0.143,
+    "ci": [
+     -0.346,
+     0.0
+    ],
+    "p": 0.1088,
+    "effect": -1.0,
+    "p_holm": 0.2176
+   },
+   "energy_fit": {
+    "diff": 0.01,
+    "ci": [
+     -0.004,
+     0.024
+    ],
+    "p": 0.2305,
+    "effect": 0.314,
+    "p_holm": 0.2305
+   }
+  }
+ },
+ "per_user": {
+  "hybrid": [
+   {
+    "completion_rate": 87.75510204081633,
+    "completed_per_day": 4.3,
+    "deadline_violation_rate": 3.7037037037037037,
+    "duration_mae": 12.90488389735077,
+    "energy_fit": 0.8210539896623019,
+    "overload_minutes": 0.0,
+    "overloaded_days": 20.0,
+    "collisions": 2.0,
+    "plan_violations": 0.0,
+    "plan_seconds": 0.2823760108499755,
+    "solver_fallbacks": 0.0
+   },
+   {
+    "completion_rate": 78.43137254901961,
+    "completed_per_day": 4.0,
+    "deadline_violation_rate": 10.344827586206897,
+    "duration_mae": 14.739866591519313,
+    "energy_fit": 0.7977973345889591,
+    "overload_minutes": 0.0,
+    "overloaded_days": 0.0,
+    "collisions": 1.6,
+    "plan_violations": 0.0,
+    "plan_seconds": 0.3230509757999812,
+    "solver_fallbacks": 0.0
+   },
+   {
+    "completion_rate": 81.25,
+    "completed_per_day": 3.9,
+    "deadline_violation_rate": 13.333333333333334,
+    "duration_mae": 20.52248459085389,
+    "energy_fit": 0.8118583089649891,
+    "overload_minutes": 0.0,
+    "overloaded_days": 20.0,
+    "collisions": 1.6,
+    "plan_violations": 0.0,
+    "plan_seconds": 0.2717166145999954,
+    "solver_fallbacks": 0.0
+   },
+   {
+    "completion_rate": 85.36585365853658,
+    "completed_per_day": 3.5,
+    "deadline_violation_rate": 8.333333333333334,
+    "duration_mae": 16.63816516275124,
+    "energy_fit": 0.8940815698102483,
+    "overload_minutes": 0.0,
+    "overloaded_days": 0.0,
+    "collisions": 1.6,
+    "plan_violations": 0.0,
+    "plan_seconds": 0.26471005194998726,
+    "solver_fallbacks": 0.0
+   },
+   {
+    "completion_rate": 97.72727272727273,
+    "completed_per_day": 4.3,
+    "deadline_violation_rate": 8.0,
+    "duration_mae": 15.02623687668945,
+    "energy_fit": 0.8712156267815471,
+    "overload_minutes": 1.527279165,
+    "overloaded_days": 10.0,
+    "collisions": 2.3,
+    "plan_violations": 0.0,
+    "plan_seconds": 0.28345013784999085,
+    "solver_fallbacks": 0.0
+   },
+   {
+    "completion_rate": 88.88888888888889,
+    "completed_per_day": 4.0,
+    "deadline_violation_rate": 3.4482758620689653,
+    "duration_mae": 15.290023474648631,
+    "energy_fit": 0.8882319425641553,
+    "overload_minutes": 0.0,
+    "overloaded_days": 10.0,
+    "collisions": 2.0,
+    "plan_violations": 0.0,
+    "plan_seconds": 0.537899357550009,
+    "solver_fallbacks": 0.0
+   },
+   {
+    "completion_rate": 74.4186046511628,
+    "completed_per_day": 3.2,
+    "deadline_violation_rate": 12.5,
+    "duration_mae": 21.831725779812167,
+    "energy_fit": 0.846543491509043,
+    "overload_minutes": 0.0,
+    "overloaded_days": 20.0,
+    "collisions": 1.8,
+    "plan_violations": 0.0,
+    "plan_seconds": 0.2690066236000007,
+    "solver_fallbacks": 0.0
+   },
+   {
+    "completion_rate": 75.55555555555556,
+    "completed_per_day": 3.4,
+    "deadline_violation_rate": 13.636363636363637,
+    "duration_mae": 18.169482589298212,
+    "energy_fit": 0.7740111392541253,
+    "overload_minutes": 0.0,
+    "overloaded_days": 0.0,
+    "collisions": 1.7,
+    "plan_violations": 0.0,
+    "plan_seconds": 0.3776767132499913,
+    "solver_fallbacks": 0.0
+   },
+   {
+    "completion_rate": 88.0952380952381,
+    "completed_per_day": 3.7,
+    "deadline_violation_rate": 10.344827586206897,
+    "duration_mae": 15.9416054253372,
+    "energy_fit": 0.8839841400049916,
+    "overload_minutes": 0.0,
+    "overloaded_days": 10.0,
+    "collisions": 1.4,
+    "plan_violations": 0.0,
+    "plan_seconds": 0.18375551359998782,
+    "solver_fallbacks": 0.0
+   },
+   {
+    "completion_rate": 80.43478260869566,
+    "completed_per_day": 3.7,
+    "deadline_violation_rate": 13.043478260869565,
+    "duration_mae": 13.583956334563627,
+    "energy_fit": 0.8843224976072106,
+    "overload_minutes": 0.0,
+    "overloaded_days": 0.0,
+    "collisions": 1.9,
+    "plan_violations": 0.0,
+    "plan_seconds": 0.303473583899995,
+    "solver_fallbacks": 0.0
+   },
+   {
+    "completion_rate": 80.43478260869566,
+    "completed_per_day": 3.7,
+    "deadline_violation_rate": 7.407407407407407,
+    "duration_mae": 16.58368546438119,
+    "energy_fit": 0.845413472947573,
+    "overload_minutes": 0.0,
+    "overloaded_days": 40.0,
+    "collisions": 1.6,
+    "plan_violations": 0.0,
+    "plan_seconds": 0.28334365880001544,
+    "solver_fallbacks": 0.0
+   },
+   {
+    "completion_rate": 93.18181818181819,
+    "completed_per_day": 4.1,
+    "deadline_violation_rate": 3.5714285714285716,
+    "duration_mae": 16.850802729559092,
+    "energy_fit": 0.7894991659061309,
+    "overload_minutes": 0.0,
+    "overloaded_days": 0.0,
+    "collisions": 2.1,
+    "plan_violations": 0.0,
+    "plan_seconds": 0.2373702548500205,
+    "solver_fallbacks": 0.0
+   },
+   {
+    "completion_rate": 89.74358974358974,
+    "completed_per_day": 3.5,
+    "deadline_violation_rate": 14.285714285714286,
+    "duration_mae": 17.928009421706737,
+    "energy_fit": 0.8932037727766663,
+    "overload_minutes": 0.0,
+    "overloaded_days": 10.0,
+    "collisions": 1.9,
+    "plan_violations": 0.0,
+    "plan_seconds": 0.27083642234999844,
+    "solver_fallbacks": 0.0
+   },
+   {
+    "completion_rate": 93.47826086956522,
+    "completed_per_day": 4.3,
+    "deadline_violation_rate": 8.823529411764707,
+    "duration_mae": 15.417942552426554,
+    "energy_fit": 0.9196266238775808,
+    "overload_minutes": 0.0,
+    "overloaded_days": 10.0,
+    "collisions": 2.2,
+    "plan_violations": 0.0,
+    "plan_seconds": 0.2815050475499902,
+    "solver_fallbacks": 0.0
+   },
+   {
+    "completion_rate": 82.97872340425532,
+    "completed_per_day": 3.9,
+    "deadline_violation_rate": 14.285714285714286,
+    "duration_mae": 16.399331288295432,
+    "energy_fit": 0.7484828289018771,
+    "overload_minutes": 0.0,
+    "overloaded_days": 0.0,
+    "collisions": 2.0,
+    "plan_violations": 0.0,
+    "plan_seconds": 0.5419044124500146,
+    "solver_fallbacks": 0.0
+   },
+   {
+    "completion_rate": 85.1063829787234,
+    "completed_per_day": 4.0,
+    "deadline_violation_rate": 3.7037037037037037,
+    "duration_mae": 13.28197711375194,
+    "energy_fit": 0.8219194353348686,
+    "overload_minutes": 0.0,
+    "overloaded_days": 10.0,
+    "collisions": 1.7,
+    "plan_violations": 0.0,
+    "plan_seconds": 0.5451399776000357,
+    "solver_fallbacks": 0.0
+   },
+   {
+    "completion_rate": 76.59574468085107,
+    "completed_per_day": 3.6,
+    "deadline_violation_rate": 4.0,
+    "duration_mae": 18.775175617625887,
+    "energy_fit": 0.8577118556497106,
+    "overload_minutes": 0.0,
+    "overloaded_days": 0.0,
+    "collisions": 1.4,
+    "plan_violations": 0.0,
+    "plan_seconds": 0.44572186530001545,
+    "solver_fallbacks": 0.0
+   },
+   {
+    "completion_rate": 80.48780487804878,
+    "completed_per_day": 3.3,
+    "deadline_violation_rate": 8.333333333333334,
+    "duration_mae": 17.77219091082553,
+    "energy_fit": 0.8382638281588813,
+    "overload_minutes": 0.0,
+    "overloaded_days": 10.0,
+    "collisions": 1.4,
+    "plan_violations": 0.0,
+    "plan_seconds": 0.5129933425000217,
+    "solver_fallbacks": 0.0
+   },
+   {
+    "completion_rate": 87.8048780487805,
+    "completed_per_day": 3.6,
+    "deadline_violation_rate": 0.0,
+    "duration_mae": 14.082349725655336,
+    "energy_fit": 0.8697527739826433,
+    "overload_minutes": 0.0,
+    "overloaded_days": 0.0,
+    "collisions": 1.6,
+    "plan_violations": 0.0,
+    "plan_seconds": 0.3866967385999828,
+    "solver_fallbacks": 0.0
+   },
+   {
+    "completion_rate": 88.88888888888889,
+    "completed_per_day": 4.0,
+    "deadline_violation_rate": 0.0,
+    "duration_mae": 8.969451983123857,
+    "energy_fit": 0.9530823835600662,
+    "overload_minutes": 0.0,
+    "overloaded_days": 0.0,
+    "collisions": 1.7,
+    "plan_violations": 0.0,
+    "plan_seconds": 0.19897447809998994,
+    "solver_fallbacks": 0.0
+   }
+  ],
+  "abl_fuzzy": [
+   {
+    "completion_rate": 84.31372549019608,
+    "completed_per_day": 4.3,
+    "deadline_violation_rate": 6.896551724137931,
+    "duration_mae": 13.156724241435022,
+    "energy_fit": 0.8447955110200087,
+    "overload_minutes": 0.0,
+    "overloaded_days": 10.0,
+    "collisions": 1.9,
+    "plan_violations": 0.0,
+    "plan_seconds": 0.2624572602500166,
+    "solver_fallbacks": 0.0
+   },
+   {
+    "completion_rate": 83.33333333333333,
+    "completed_per_day": 4.0,
+    "deadline_violation_rate": 13.793103448275861,
+    "duration_mae": 15.7404389669796,
+    "energy_fit": 0.8049872157546268,
+    "overload_minutes": 0.0,
+    "overloaded_days": 0.0,
+    "collisions": 1.3,
+    "plan_violations": 0.0,
+    "plan_seconds": 0.3074006177000001,
+    "solver_fallbacks": 0.0
+   },
+   {
+    "completion_rate": 84.0,
+    "completed_per_day": 4.2,
+    "deadline_violation_rate": 16.666666666666668,
+    "duration_mae": 16.74506081592982,
+    "energy_fit": 0.8252792243450674,
+    "overload_minutes": 0.0,
+    "overloaded_days": 10.0,
+    "collisions": 1.6,
+    "plan_violations": 0.0,
+    "plan_seconds": 0.30031233249998196,
+    "solver_fallbacks": 0.0
+   },
+   {
+    "completion_rate": 83.33333333333333,
+    "completed_per_day": 3.5,
+    "deadline_violation_rate": 12.0,
+    "duration_mae": 16.091448981171137,
+    "energy_fit": 0.8792358416804618,
+    "overload_minutes": 0.0,
+    "overloaded_days": 10.0,
+    "collisions": 1.6,
+    "plan_violations": 0.0,
+    "plan_seconds": 0.4626696141999787,
+    "solver_fallbacks": 0.0
+   },
+   {
+    "completion_rate": 90.9090909090909,
+    "completed_per_day": 4.0,
+    "deadline_violation_rate": 9.090909090909092,
+    "duration_mae": 17.95735254928217,
+    "energy_fit": 0.8563761927278597,
+    "overload_minutes": 0.0,
+    "overloaded_days": 0.0,
+    "collisions": 2.4,
+    "plan_violations": 0.0,
+    "plan_seconds": 0.25289777749999304,
+    "solver_fallbacks": 0.0
+   },
+   {
+    "completion_rate": 86.36363636363636,
+    "completed_per_day": 3.8,
+    "deadline_violation_rate": 6.666666666666667,
+    "duration_mae": 18.555540741823428,
+    "energy_fit": 0.9070372005130313,
+    "overload_minutes": 0.0,
+    "overloaded_days": 0.0,
+    "collisions": 1.8,
+    "plan_violations": 0.0,
+    "plan_seconds": 0.5828579712999954,
+    "solver_fallbacks": 0.0
+   },
+   {
+    "completion_rate": 83.33333333333333,
+    "completed_per_day": 3.5,
+    "deadline_violation_rate": 7.6923076923076925,
+    "duration_mae": 17.100147579699346,
+    "energy_fit": 0.8752103211626687,
+    "overload_minutes": 0.0,
+    "overloaded_days": 10.0,
+    "collisions": 1.8,
+    "plan_violations": 0.0,
+    "plan_seconds": 0.488683706699976,
+    "solver_fallbacks": 0.0
+   },
+   {
+    "completion_rate": 83.72093023255815,
+    "completed_per_day": 3.6,
+    "deadline_violation_rate": 4.0,
+    "duration_mae": 14.998155525778621,
+    "energy_fit": 0.7997713392123014,
+    "overload_minutes": 0.0,
+    "overloaded_days": 0.0,
+    "collisions": 1.8,
+    "plan_violations": 0.0,
+    "plan_seconds": 0.2583445607500039,
+    "solver_fallbacks": 0.0
+   },
+   {
+    "completion_rate": 90.69767441860465,
+    "completed_per_day": 3.9,
+    "deadline_violation_rate": 10.0,
+    "duration_mae": 15.034499435089025,
+    "energy_fit": 0.9091210779164833,
+    "overload_minutes": 0.0,
+    "overloaded_days": 10.0,
+    "collisions": 1.6,
+    "plan_violations": 0.0,
+    "plan_seconds": 0.27684282129999926,
+    "solver_fallbacks": 0.0
+   },
+   {
+    "completion_rate": 75.0,
+    "completed_per_day": 3.6,
+    "deadline_violation_rate": 19.047619047619047,
+    "duration_mae": 14.807428716408443,
+    "energy_fit": 0.8947308023515732,
+    "overload_minutes": 0.0,
+    "overloaded_days": 10.0,
+    "collisions": 1.8,
+    "plan_violations": 0.0,
+    "plan_seconds": 0.28970635180000953,
+    "solver_fallbacks": 0.0
+   },
+   {
+    "completion_rate": 87.23404255319149,
+    "completed_per_day": 4.1,
+    "deadline_violation_rate": 7.6923076923076925,
+    "duration_mae": 15.55260521866041,
+    "energy_fit": 0.8348031769564238,
+    "overload_minutes": 0.0,
+    "overloaded_days": 0.0,
+    "collisions": 1.7,
+    "plan_violations": 0.0,
+    "plan_seconds": 0.25932714170003235,
+    "solver_fallbacks": 0.0
+   },
+   {
+    "completion_rate": 78.72340425531915,
+    "completed_per_day": 3.7,
+    "deadline_violation_rate": 3.7037037037037037,
+    "duration_mae": 15.230728719938254,
+    "energy_fit": 0.8025660521112918,
+    "overload_minutes": 0.0,
+    "overloaded_days": 10.0,
+    "collisions": 1.8,
+    "plan_violations": 0.0,
+    "plan_seconds": 0.2794708069500075,
+    "solver_fallbacks": 0.0
+   },
+   {
+    "completion_rate": 85.71428571428571,
+    "completed_per_day": 3.6,
+    "deadline_violation_rate": 11.538461538461538,
+    "duration_mae": 14.166913837397123,
+    "energy_fit": 0.8960444100646848,
+    "overload_minutes": 0.0,
+    "overloaded_days": 10.0,
+    "collisions": 1.6,
+    "plan_violations": 0.0,
+    "plan_seconds": 0.3821149224000123,
+    "solver_fallbacks": 0.0
+   },
+   {
+    "completion_rate": 89.36170212765957,
+    "completed_per_day": 4.2,
+    "deadline_violation_rate": 11.11111111111111,
+    "duration_mae": 15.427332328048625,
+    "energy_fit": 0.9360413345142969,
+    "overload_minutes": 0.0,
+    "overloaded_days": 10.0,
+    "collisions": 1.8,
+    "plan_violations": 0.0,
+    "plan_seconds": 0.3838405911000109,
+    "solver_fallbacks": 0.0
+   },
+   {
+    "completion_rate": 79.59183673469387,
+    "completed_per_day": 3.9,
+    "deadline_violation_rate": 12.0,
+    "duration_mae": 15.172928657376625,
+    "energy_fit": 0.8169460826660022,
+    "overload_minutes": 0.0,
+    "overloaded_days": 20.0,
+    "collisions": 1.8,
+    "plan_violations": 0.0,
+    "plan_seconds": 0.6059616056499977,
+    "solver_fallbacks": 0.0
+   },
+   {
+    "completion_rate": 85.41666666666667,
+    "completed_per_day": 4.1,
+    "deadline_violation_rate": 3.5714285714285716,
+    "duration_mae": 13.226667891081474,
+    "energy_fit": 0.8380196521483735,
+    "overload_minutes": 0.0,
+    "overloaded_days": 10.0,
+    "collisions": 1.6,
+    "plan_violations": 0.0,
+    "plan_seconds": 0.554975050249982,
+    "solver_fallbacks": 0.0
+   },
+   {
+    "completion_rate": 86.95652173913044,
+    "completed_per_day": 4.0,
+    "deadline_violation_rate": 7.6923076923076925,
+    "duration_mae": 14.865031668302208,
+    "energy_fit": 0.8703230783819864,
+    "overload_minutes": 0.0,
+    "overloaded_days": 0.0,
+    "collisions": 1.4,
+    "plan_violations": 0.0,
+    "plan_seconds": 0.4776042387499956,
+    "solver_fallbacks": 0.0
+   },
+   {
+    "completion_rate": 81.3953488372093,
+    "completed_per_day": 3.5,
+    "deadline_violation_rate": 4.166666666666667,
+    "duration_mae": 15.748857496620417,
+    "energy_fit": 0.8575788918992227,
+    "overload_minutes": 0.0,
+    "overloaded_days": 0.0,
+    "collisions": 1.5,
+    "plan_violations": 0.0,
+    "plan_seconds": 0.5355329016000155,
+    "solver_fallbacks": 0.0
+   },
+   {
+    "completion_rate": 85.0,
+    "completed_per_day": 3.4,
+    "deadline_violation_rate": 5.0,
+    "duration_mae": 14.170518751279035,
+    "energy_fit": 0.8522175730444881,
+    "overload_minutes": 0.0,
+    "overloaded_days": 0.0,
+    "collisions": 1.2,
+    "plan_violations": 0.0,
+    "plan_seconds": 0.4790760758499914,
+    "solver_fallbacks": 0.0
+   },
+   {
+    "completion_rate": 84.44444444444444,
+    "completed_per_day": 3.8,
+    "deadline_violation_rate": 8.0,
+    "duration_mae": 10.898993697382354,
+    "energy_fit": 0.9166652594709936,
+    "overload_minutes": 0.0,
+    "overloaded_days": 0.0,
+    "collisions": 1.9,
+    "plan_violations": 0.0,
+    "plan_seconds": 0.18675249899997654,
+    "solver_fallbacks": 0.0
+   }
+  ],
+  "abl_no_context": [
+   {
+    "completion_rate": 90.19607843137256,
+    "completed_per_day": 4.6,
+    "deadline_violation_rate": 7.142857142857143,
+    "duration_mae": 14.873523994913858,
+    "energy_fit": 0.8710849070656232,
+    "overload_minutes": 0.0,
+    "overloaded_days": 10.0,
+    "collisions": 1.8,
+    "plan_violations": 0.0,
+    "plan_seconds": 0.2004315031000033,
+    "solver_fallbacks": 0.0
+   },
+   {
+    "completion_rate": 80.76923076923077,
+    "completed_per_day": 4.2,
+    "deadline_violation_rate": 9.375,
+    "duration_mae": 15.673936011286022,
+    "energy_fit": 0.788970227301877,
+    "overload_minutes": 0.0,
+    "overloaded_days": 30.0,
+    "collisions": 1.6,
+    "plan_violations": 0.0,
+    "plan_seconds": 0.26937660280003684,
+    "solver_fallbacks": 0.0
+   },
+   {
+    "completion_rate": 81.63265306122449,
+    "completed_per_day": 4.0,
+    "deadline_violation_rate": 6.896551724137931,
+    "duration_mae": 19.287365925926512,
+    "energy_fit": 0.8349076592238689,
+    "overload_minutes": 0.0,
+    "overloaded_days": 10.0,
+    "collisions": 1.7,
+    "plan_violations": 0.0,
+    "plan_seconds": 0.23587347200002567,
+    "solver_fallbacks": 0.0
+   },
+   {
+    "completion_rate": 82.92682926829268,
+    "completed_per_day": 3.4,
+    "deadline_violation_rate": 7.6923076923076925,
+    "duration_mae": 17.27910358998996,
+    "energy_fit": 0.8495207627783193,
+    "overload_minutes": 0.0,
+    "overloaded_days": 10.0,
+    "collisions": 1.5,
+    "plan_violations": 0.0,
+    "plan_seconds": 0.2021332525000048,
+    "solver_fallbacks": 0.0
+   },
+   {
+    "completion_rate": 95.45454545454545,
+    "completed_per_day": 4.2,
+    "deadline_violation_rate": 4.166666666666667,
+    "duration_mae": 15.70400676502576,
+    "energy_fit": 0.8140994168997578,
+    "overload_minutes": 1.7380021966666663,
+    "overloaded_days": 10.0,
+    "collisions": 2.2,
+    "plan_violations": 0.0,
+    "plan_seconds": 0.23983004694998727,
+    "solver_fallbacks": 0.0
+   },
+   {
+    "completion_rate": 91.48936170212765,
+    "completed_per_day": 4.3,
+    "deadline_violation_rate": 3.3333333333333335,
+    "duration_mae": 14.952341239658017,
+    "energy_fit": 0.8626677130904218,
+    "overload_minutes": 0.0,
+    "overloaded_days": 10.0,
+    "collisions": 2.1,
+    "plan_violations": 0.0,
+    "plan_seconds": 0.28799922959998414,
+    "solver_fallbacks": 0.0
+   },
+   {
+    "completion_rate": 69.04761904761905,
+    "completed_per_day": 2.9,
+    "deadline_violation_rate": 20.0,
+    "duration_mae": 21.05751051091602,
+    "energy_fit": 0.8047093903320662,
+    "overload_minutes": 0.0,
+    "overloaded_days": 0.0,
+    "collisions": 1.6,
+    "plan_violations": 0.0,
+    "plan_seconds": 0.5142541706499741,
+    "solver_fallbacks": 0.0
+   },
+   {
+    "completion_rate": 74.46808510638297,
+    "completed_per_day": 3.5,
+    "deadline_violation_rate": 8.333333333333334,
+    "duration_mae": 11.891730053916724,
+    "energy_fit": 0.7923146187385505,
+    "overload_minutes": 0.0,
+    "overloaded_days": 10.0,
+    "collisions": 1.8,
+    "plan_violations": 0.0,
+    "plan_seconds": 0.11195759244997135,
+    "solver_fallbacks": 0.0
+   },
+   {
+    "completion_rate": 87.23404255319149,
+    "completed_per_day": 4.1,
+    "deadline_violation_rate": 10.0,
+    "duration_mae": 15.272183941760069,
+    "energy_fit": 0.8348283751187674,
+    "overload_minutes": 0.0,
+    "overloaded_days": 0.0,
+    "collisions": 2.0,
+    "plan_violations": 0.0,
+    "plan_seconds": 0.17959914125000295,
+    "solver_fallbacks": 0.0
+   },
+   {
+    "completion_rate": 77.77777777777777,
+    "completed_per_day": 3.5,
+    "deadline_violation_rate": 16.666666666666668,
+    "duration_mae": 17.52085711061513,
+    "energy_fit": 0.8955816969159627,
+    "overload_minutes": 0.0,
+    "overloaded_days": 0.0,
+    "collisions": 1.8,
+    "plan_violations": 0.0,
+    "plan_seconds": 0.2031233893499916,
+    "solver_fallbacks": 0.0
+   },
+   {
+    "completion_rate": 81.25,
+    "completed_per_day": 3.9,
+    "deadline_violation_rate": 3.7037037037037037,
+    "duration_mae": 15.579123106983888,
+    "energy_fit": 0.849785804704395,
+    "overload_minutes": 0.0,
+    "overloaded_days": 20.0,
+    "collisions": 1.8,
+    "plan_violations": 0.0,
+    "plan_seconds": 0.2503113787499956,
+    "solver_fallbacks": 0.0
+   },
+   {
+    "completion_rate": 74.0,
+    "completed_per_day": 3.7,
+    "deadline_violation_rate": 7.407407407407407,
+    "duration_mae": 13.287682539734723,
+    "energy_fit": 0.7861388354128812,
+    "overload_minutes": 1.06385013,
+    "overloaded_days": 0.0,
+    "collisions": 2.1,
+    "plan_violations": 0.0,
+    "plan_seconds": 0.3513218617499774,
+    "solver_fallbacks": 0.0
+   },
+   {
+    "completion_rate": 85.36585365853658,
+    "completed_per_day": 3.5,
+    "deadline_violation_rate": 19.23076923076923,
+    "duration_mae": 14.411633558324466,
+    "energy_fit": 0.8887449705341846,
+    "overload_minutes": 0.0,
+    "overloaded_days": 0.0,
+    "collisions": 1.9,
+    "plan_violations": 0.0,
+    "plan_seconds": 0.3713932501999693,
+    "solver_fallbacks": 0.0
+   },
+   {
+    "completion_rate": 97.77777777777777,
+    "completed_per_day": 4.4,
+    "deadline_violation_rate": 2.7777777777777777,
+    "duration_mae": 15.41908534580805,
+    "energy_fit": 0.8624462864130116,
+    "overload_minutes": 1.5947225033333332,
+    "overloaded_days": 0.0,
+    "collisions": 2.2,
+    "plan_violations": 0.0,
+    "plan_seconds": 0.41288016379998,
+    "solver_fallbacks": 0.0
+   },
+   {
+    "completion_rate": 79.59183673469387,
+    "completed_per_day": 3.9,
+    "deadline_violation_rate": 18.51851851851852,
+    "duration_mae": 14.098495779672453,
+    "energy_fit": 0.7681392893529817,
+    "overload_minutes": 0.0,
+    "overloaded_days": 0.0,
+    "collisions": 2.0,
+    "plan_violations": 0.0,
+    "plan_seconds": 0.49910018069997475,
+    "solver_fallbacks": 0.0
+   },
+   {
+    "completion_rate": 75.51020408163265,
+    "completed_per_day": 3.7,
+    "deadline_violation_rate": 3.8461538461538463,
+    "duration_mae": 13.786348982038822,
+    "energy_fit": 0.8465858811218624,
+    "overload_minutes": 0.0,
+    "overloaded_days": 0.0,
+    "collisions": 1.8,
+    "plan_violations": 0.0,
+    "plan_seconds": 0.4221110965999856,
+    "solver_fallbacks": 0.0
+   },
+   {
+    "completion_rate": 93.33333333333333,
+    "completed_per_day": 4.2,
+    "deadline_violation_rate": 3.8461538461538463,
+    "duration_mae": 17.93705743761686,
+    "energy_fit": 0.8397009677738219,
+    "overload_minutes": 0.0,
+    "overloaded_days": 10.0,
+    "collisions": 1.7,
+    "plan_violations": 0.0,
+    "plan_seconds": 0.3279073460999484,
+    "solver_fallbacks": 0.0
+   },
+   {
+    "completion_rate": 80.95238095238095,
+    "completed_per_day": 3.4,
+    "deadline_violation_rate": 4.3478260869565215,
+    "duration_mae": 17.174876217550285,
+    "energy_fit": 0.8652063147992245,
+    "overload_minutes": 0.0,
+    "overloaded_days": 10.0,
+    "collisions": 1.5,
+    "plan_violations": 0.0,
+    "plan_seconds": 0.4347052964000341,
+    "solver_fallbacks": 0.0
+   },
+   {
+    "completion_rate": 87.17948717948718,
+    "completed_per_day": 3.4,
+    "deadline_violation_rate": 4.761904761904762,
+    "duration_mae": 19.77562605035841,
+    "energy_fit": 0.827639615803127,
+    "overload_minutes": 0.0,
+    "overloaded_days": 10.0,
+    "collisions": 1.4,
+    "plan_violations": 0.0,
+    "plan_seconds": 0.25443706605000216,
+    "solver_fallbacks": 0.0
+   },
+   {
+    "completion_rate": 80.43478260869566,
+    "completed_per_day": 3.7,
+    "deadline_violation_rate": 4.166666666666667,
+    "duration_mae": 9.114724223558214,
+    "energy_fit": 0.9282968703050376,
+    "overload_minutes": 0.0,
+    "overloaded_days": 0.0,
+    "collisions": 1.9,
+    "plan_violations": 0.0,
+    "plan_seconds": 0.2659836177999978,
+    "solver_fallbacks": 0.0
+   }
+  ]
+ },
+ "data": "synthetic",
+ "command": "python -m ai.evaluation.compare hybrid,abl_fuzzy,abl_no_context --users 20 --days 10 --difficulty moderate"
+}

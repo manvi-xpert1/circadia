@@ -11,7 +11,7 @@ from dataclasses import dataclass
 SOFT_RULES = [
     ("A1", "Focus run longer than your max focus block without a break", "Penalty; suggest a break"),
     ("A2", "A day's planned minutes exceed 85% of its free minutes", "Overload penalty"),
-    ("A3", "Task placed where its energy fit is below 0.35", "Penalty; warns 'low energy fit'"),
+    ("A3", "Task placed where it is unlikely to happen (chance below 0.35)", "Penalty; warns 'unlikely at this time'"),
     ("A4", "High-priority task due within a day", "Bonus for earlier placement (via priority discount)"),
     ("A5", "Latest check-in has stress 8 or more", "Cap that day's load at 70%"),
     ("A6", "Two back-to-back blocks both with mental demand 7 or more", "Context-load penalty"),

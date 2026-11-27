@@ -1,17 +1,17 @@
 """Explanation module (design section 3.2, module 6).
 
-Template-based, expert-system style explanations: every sentence is built
-from numbers the algorithms actually used (fuzzy rule strengths, duration
-estimates, probabilities, rules applied). Nothing here is generated text.
+Template-based explanations: every sentence is built from numbers the
+algorithms actually used (the completion model's factors, duration estimates,
+probabilities, rules applied). Nothing here is generated text.
 """
 from __future__ import annotations
 
+import math
 from datetime import datetime, timedelta
 
 import numpy as np
 
-from ..fuzzy.engine import RULE_TEXT, suitability
-from ..fuzzy.membership import suitability_label
+from ..probability.completion import context_features
 from ..ga.decoder import BLOCKED, DEPENDENCY, LEFT_OUT, NO_ROOM, decode
 from ..ga.fitness import evaluate, on_time_table, weights_for
 from ..ga.runner import GAResult, best_fit_hints
@@ -22,8 +22,8 @@ from ..types import PRIORITY_NAMES
 PART_NAMES = {
     "pri": "priority coverage",
     "dl": "deadline safety",
-    "en": "energy fit",
-    "dur": "realistic durations",
+    "en": "chance each block happens at its time",
+    "dur": "blocks long enough for the work",
     "pref": "your break and late-work preferences",
     "over": "overload",
     "cs": "context switching",
@@ -106,6 +106,54 @@ def next_best(p: Problem, i: int, starts, lengths) -> dict | None:
     return {"start": p.slot_dt(best[0]).isoformat(), "label": when(p, p.slot_dt(best[0])), "fit": round(best[1], 2)}
 
 
+def likelihood_label(prob: float) -> str:
+    if prob >= 0.85:
+        return "Very likely"
+    if prob >= 0.7:
+        return "Likely"
+    if prob >= 0.5:
+        return "Uncertain"
+    return "Unlikely"
+
+
+def block_factors(p: Problem, i: int, s: int) -> tuple[dict, list[dict]]:
+    """The completion model's view of task i starting at slot s, and its factors in plain words.
+
+    Each factor's effect is in percentage points: how much the probability moves
+    when that one factor is set back to a neutral value (no shortfall, average
+    focus and stress, a one-hour block, no category effect).
+    """
+    ti = p.tasks[i]
+    t = ti.task
+    mental, physical = p.slot_energy(s)
+    st = p.day_states[p.day_of(s)]
+    x = context_features(t.mental_demand, t.physical_demand, mental, physical, st.focus, st.stress, ti.est)
+    pred = p.completion.predict(t.category, x)
+    mu, v = p.completion.predict_logit(t.category, x)
+    scale = math.sqrt(1 + math.pi * v / 8)
+
+    def prob(z: float) -> float:
+        return 1 / (1 + math.exp(-z / scale))
+
+    words = {
+        "mental_shortfall": f"needs {t.mental_demand:.0f}/10 mental energy; about {mental:.0f}/10 expected then",
+        "physical_shortfall": f"needs {t.physical_demand:.0f}/10 physical energy; about {physical:.0f}/10 expected then",
+        "focus": f"focus {st.focus:.0f}/10 that day",
+        "stress": f"stress {st.stress:.0f}/10 that day",
+        "log_duration": f"a {ti.planned_minutes}-minute block",
+        "category": f"your record with {t.category} tasks",
+    }
+    factors = []
+    for k, c in pred.contributions.items():
+        effect = prob(mu) - prob(mu - c)
+        if abs(effect) >= 0.02:
+            factors.append({"factor": k, "text": words.get(k, k), "effect": round(100 * effect)})
+    factors.sort(key=lambda f: abs(f["effect"]), reverse=True)
+    info = {"p": round(pred.p, 2), "low": round(pred.low, 2), "high": round(pred.high, 2), "based_on": pred.n,
+            "label": likelihood_label(pred.p)}
+    return info, factors[:4]
+
+
 def explain_block(p: Problem, i: int, res: GAResult, flags: dict) -> dict:
     ti = p.tasks[i]
     t = ti.task
@@ -113,15 +161,11 @@ def explain_block(p: Problem, i: int, res: GAResult, flags: dict) -> dict:
     L = res.decoded.lengths[i]
     start = p.slot_dt(s)
     end = start + timedelta(minutes=ti.planned_minutes)
-    fit = p.block_fit(i, s, L)
-    label = suitability_label(fit)
+    fit = p.block_fit(i, s, L)  # P(block happens), averaged over the block's slots
+    label = likelihood_label(fit)
     cap = float(p.cap[s])
     mental, physical = p.slot_energy(s)
-    trace = suitability(round(cap - t.mental_demand, 2), round(physical - t.physical_demand, 2))
-    fired = [
-        {"id": f.rule, "strength": round(f.strength, 2), "text": RULE_TEXT[f.rule]}
-        for f in sorted(trace.fired, key=lambda f: -f.strength)
-    ]
+    happens, factors = block_factors(p, i, s)
     state = p.day_states[p.day_of(s)]
     p_on_time = float(on_time_table(p)[i, s]) if t.deadline else None
 
@@ -138,8 +182,8 @@ def explain_block(p: Problem, i: int, res: GAResult, flags: dict) -> dict:
         rules.append(f"Finishes {span((t.deadline - end).total_seconds() / 60)} before its deadline (H7)")
 
     warnings: list[str] = []
-    if fit < 0.35:
-        warnings.append("Low energy fit for this task (A3); expect it to feel harder.")
+    if fit < 0.5:
+        warnings.append(f"Only about {round(100 * fit)}% likely to happen at this time (A3); it may be worth moving.")
     if s in flags["a1"]:
         warnings.append("Part of a long run of work with no break (A1); consider a short pause before it.")
     if s in flags["a7"]:
@@ -153,15 +197,15 @@ def explain_block(p: Problem, i: int, res: GAResult, flags: dict) -> dict:
     slack_h = (t.deadline - end).total_seconds() / 3600 if t.deadline else None
     if slack_h is not None and slack_h < 24:
         verdict = f"Placed {when(p, start)} so it finishes {span(slack_h * 60)} before its deadline."
-    elif fit >= 0.7:
+    elif fit >= 0.8:
         verdict = (
-            f"Placed {when(p, start)} because your expected capacity then ({cap:.1f}/10) "
-            f"matches what this task needs ({t.mental_demand:.1f}/10)."
+            f"Placed {when(p, start)}: you're expected to have about {mental:.0f}/10 mental energy then, "
+            f"and blocks like this usually happen at times like that."
         )
-    elif fit < 0.45:
-        verdict = f"Placed {when(p, start)} because no better-fitting free time was left; the fit is only {label.lower()}."
+    elif fit < 0.5:
+        verdict = f"Placed {when(p, start)} because no better time was left; it's {label.lower()} to happen."
     else:
-        verdict = f"Placed {when(p, start)}, a {label.lower()} fit ({fit:.2f}) at the best time left after higher-priority work."
+        verdict = f"Placed {when(p, start)}, the best time left after higher-priority work ({label.lower()} to happen)."
 
     return {
         "task_id": t.id,
@@ -177,15 +221,19 @@ def explain_block(p: Problem, i: int, res: GAResult, flags: dict) -> dict:
         "est_minutes": int(ti.est),
         "fit": round(fit, 2),
         "fit_label": label,
-        "capacity": round(cap, 2),
+        "capacity": round(cap, 2),  # projected mental energy at the start, 0-10
         "mental_demand": t.mental_demand,
         "physical_demand": t.physical_demand,
         "slot_mental": round(mental, 1),
         "slot_physical": round(physical, 1),
         "energy_source": state.source,
-        "fired_rules": fired,
+        "happens": happens,
+        "factors": factors,
+        "context": {"start": start.isoformat(), "mental_demand": t.mental_demand, "physical_demand": t.physical_demand,
+                    "expected_mental": round(mental, 2), "expected_physical": round(physical, 2),
+                    "focus": state.focus, "stress": state.stress},
         "duration": {**ti.dur.as_dict(), "text": duration_text(ti), "p80": round(ti.p80, 1)},
-        "p_complete": round(ti.p_complete, 2),
+        "p_complete": round(fit * ti.p_fits, 2),
         "p_on_time": round(p_on_time, 2) if p_on_time is not None else None,
         "deadline": t.deadline.isoformat() if t.deadline else None,
         "rules_applied": rules,

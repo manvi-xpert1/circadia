@@ -38,34 +38,44 @@ export function WhyPanel({ block, onClose }: { block: Block; onClose: () => void
         <>
           <section className="mt-5 border-t border-line/80 pt-4">
             <div className="flex items-baseline justify-between">
-              <h3 className="text-[13px] font-semibold text-muted">Energy fit</h3>
-              <Badge tone={fitTone(block.fit_label)}>{block.fit_label} {block.fit?.toFixed(2)}</Badge>
+              <h3 className="text-[13px] font-semibold text-muted">Chance it happens at this time</h3>
+              <Badge tone={fitTone(block.fit_label)}>{block.fit_label} · {Math.round((block.fit ?? 0) * 100)}%</Badge>
             </div>
+            {block.happens && (
+              <p className="mt-2 text-[13px] text-muted">
+                Likely range <span className="num">{Math.round(block.happens.low * 100)}–{Math.round(block.happens.high * 100)}%</span>,{" "}
+                {block.happens.based_on === 0
+                  ? "from the starting assumption (no outcomes recorded yet), so treat it as rough."
+                  : `learned from ${block.happens.based_on} recorded outcome${block.happens.based_on === 1 ? "" : "s"}.`}
+              </p>
+            )}
             <p className="mt-2 text-[13.5px] text-ink/90">
-              Expected capacity <span className="num font-medium">{block.capacity?.toFixed(1)}</span>/10 against a mental demand of{" "}
-              <span className="num font-medium">{block.mental_demand}</span>. Physical energy <span className="num">{block.slot_physical}</span> against{" "}
+              Expected mental energy <span className="num font-medium">{(block.slot_mental ?? block.capacity)?.toFixed(1)}</span>/10 against a demand of{" "}
+              <span className="num font-medium">{block.mental_demand}</span>; physical <span className="num">{block.slot_physical?.toFixed(1)}</span> against{" "}
               <span className="num">{block.physical_demand}</span>.
               {block.energy_source === "forecast" && " Energy for this day is a forecast."}
             </p>
-            {!!block.fired_rules?.length && (
-              <ul className="mt-2 space-y-1">
-                {block.fired_rules.map((r) => (
-                  <li key={r.id} className="flex items-center gap-2 text-[13px]">
-                    <span className="num w-9 shrink-0 rounded bg-beige px-1 text-center text-[12px] font-medium">{r.id}</span>
-                    <span className="flex-1 text-ink/85">{r.text}</span>
-                    <span className="num text-muted">{Math.round(r.strength * 100)}%</span>
+            {!!block.factors?.length && (
+              <ul className="mt-2 space-y-1" aria-label="What moves this chance">
+                {block.factors.map((f) => (
+                  <li key={f.factor} className="flex items-center gap-2 text-[13px]">
+                    <span className={`num w-12 shrink-0 rounded px-1 text-center text-[12px] font-medium ${f.effect < 0 ? "bg-danger/10 text-danger" : "bg-sage/15 text-ink"}`}>
+                      {f.effect > 0 ? "+" : "−"}{Math.abs(f.effect)}
+                    </span>
+                    <span className="flex-1 text-ink/85">{f.text}</span>
                   </li>
                 ))}
+                <li className="hint">Points of probability, compared with a neutral block.</li>
               </ul>
             )}
-            {block.next_best && <p className="mt-2 text-[13px] text-muted">Next best time: {block.next_best.label}, fit {block.next_best.fit.toFixed(2)}.</p>}
+            {block.next_best && <p className="mt-2 text-[13px] text-muted">Next best time: {block.next_best.label}, {Math.round(block.next_best.fit * 100)}%.</p>}
           </section>
 
           <section className="mt-4 border-t border-line/80 pt-4">
             <h3 className="text-[13px] font-semibold text-muted">Duration</h3>
             <p className="mt-1 text-[13.5px]">{block.duration?.text}</p>
             <div className="mt-3 space-y-2.5">
-              <Meter label="Chance it gets done in this block" value={block.p_complete ?? 0} />
+              <Meter label="Chance it happens and fits in this block" value={block.p_complete ?? 0} />
               {block.p_on_time != null && <Meter label="Chance it finishes before the deadline" value={block.p_on_time} tone="sage" />}
             </div>
           </section>

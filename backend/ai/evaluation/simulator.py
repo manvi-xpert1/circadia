@@ -7,7 +7,7 @@ Each synthetic user has parameters the planner never sees:
 
 The planner only sees noisy morning check-ins and the outcomes it observes.
 How well a block really fits is judged by a simple ground-truth formula that is
-deliberately NOT the planner's fuzzy model, so the evaluation is not circular:
+deliberately NOT the planner's completion model, so the evaluation is not circular:
 
     true_fit = exp(-(mental deficit)^2 / 10 - (physical deficit)^2 / 12)
 

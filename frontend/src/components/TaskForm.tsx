@@ -127,7 +127,7 @@ export function TaskForm({ task, onDone }: { task?: Task; onDone: () => void }) 
 
       <fieldset className="space-y-4">
         <legend className="mb-1 text-[13px] font-semibold text-muted">Energy demand</legend>
-        <p className="hint -mt-2">The fuzzy engine compares these with your energy in each time slot.</p>
+        <p className="hint -mt-2">The planner compares these with your expected energy at each time to judge how likely a block is to happen.</p>
         <EnergySlider id="t-md" label="Mental difficulty" low="Easy" high="Hard" value={f.mental_difficulty} onChange={(v) => set("mental_difficulty", v)} />
         <EnergySlider id="t-mr" label="Mental energy needed" low="Little" high="A lot" value={f.mental_energy_req} onChange={(v) => set("mental_energy_req", v)} />
         <EnergySlider id="t-pd" label="Physical difficulty" low="Easy" high="Hard" value={f.physical_difficulty} onChange={(v) => set("physical_difficulty", v)} />

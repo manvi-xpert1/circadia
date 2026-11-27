@@ -72,9 +72,21 @@ def to_ai_task(t: Task) -> T.TaskIn:
     )
 
 
+def outcome_context(c: dict | None) -> T.OutcomeContext | None:
+    if not c:
+        return None
+    try:
+        return T.OutcomeContext(datetime.fromisoformat(c["start"]), float(c["mental_demand"]), float(c["physical_demand"]),
+                                float(c["expected_mental"]), float(c["expected_physical"]), float(c["focus"]),
+                                float(c["stress"]))
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
 def load_outcomes(db: Session, user: User) -> list[T.Outcome]:
     rows = db.scalars(select(TaskOutcome).where(TaskOutcome.user_id == user.id).order_by(TaskOutcome.recorded_at))
-    return [T.Outcome(o.category, o.status, o.est_minutes, o.actual_minutes) for o in rows]
+    return [T.Outcome(o.category, o.status, o.est_minutes, o.actual_minutes, outcome_context(o.context_json))
+            for o in rows]
 
 
 def load_checkins(db: Session, user: User, limit: int = 120) -> list[T.CheckIn]:
@@ -130,6 +142,8 @@ def build_request(db: Session, user: User, now: datetime, horizon: int | None, p
         previous=previous,
         stability=float(stored.replan_stability if stability is None else stability),
         optimizer=optimizer or stored.optimizer or "hybrid",
+        simulation=stored.simulation or "standard",
+        reserve_quantile=float(stored.block_quantile if stored.block_quantile is not None else 0.65),
     )
 
 

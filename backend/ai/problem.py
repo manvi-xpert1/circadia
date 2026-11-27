@@ -3,8 +3,9 @@
 Each day of the horizon is cut into 15-minute slots between day_start and
 day_end; all slots are numbered in one sequence (g = day * slots_per_day + k).
 This module turns raw inputs into everything the optimiser looks up:
-free intervals, block lengths, deadline limits, dependencies and the fuzzy
-suitability matrix U[task, slot].
+free intervals, block lengths, deadline limits, dependencies and the matrix
+U[task, slot] = P(the block happens if it starts in that slot), from the
+contextual completion model.
 """
 from __future__ import annotations
 
@@ -15,10 +16,9 @@ from datetime import date, datetime, time, timedelta
 
 import numpy as np
 
-from .fuzzy.engine import capacity_value, suitability_value
-from .fuzzy.profile import DayState, EnergyProfile, learn_profile, project, state_for_day
+from .probability.completion import FEATURES, FOCUS_CENTRE, FOCUS_SCALE, STRESS_CENTRE, STRESS_SCALE, CompletionModel, context_features
 from .probability.duration_model import DurationEstimate, DurationModel
-from .probability.followthrough import FollowThroughModel
+from .probability.energy_profile import DayState, EnergyProfile, learn_profile, project, state_for_day
 from .types import PlanRequest, TaskIn
 
 SLOT = 15  # minutes
@@ -36,11 +36,11 @@ class TaskInfo:
     idx: int
     est: float  # minutes still to do (estimate minus minutes already spent)
     dur: DurationEstimate
-    p80: float
-    planned_minutes: int  # P80 rounded up to 5 minutes, shown to the user
+    p80: float  # predicted 80th-percentile duration (a prediction, not a reservation)
+    planned_minutes: int  # time reserved for the block: the reservation quantile, rounded up to 5 minutes
     slots_p80: int
     slots_est: int
-    follow: float
+    follow: float  # P(a block of this task happens) at an average time, from the completion model
     dl_end: int  # latest allowed end slot (exclusive index); G when no deadline in horizon
     dep_idx: int | None = None  # index of a movable task this one depends on
     dep_earliest: int = 0  # earliest start because of a fixed / locked dependency
@@ -48,8 +48,14 @@ class TaskInfo:
     blocked_by_room: bool = False  # True when the pre-check found no gap long enough for P80
 
     @cached_property
+    def p_fits(self) -> float:
+        """P(the work fits the reserved block), from the duration model."""
+        return self.dur.p_fits(self.planned_minutes, self.est)
+
+    @cached_property
     def p_complete(self) -> float:
-        return self.follow * self.dur.p_fits(self.planned_minutes, self.est)
+        """P(happens) x P(fits), at an average time; block-specific values use U."""
+        return self.follow * self.p_fits
 
 
 @dataclass
@@ -75,13 +81,13 @@ class Problem:
     tasks: list[TaskInfo]
     fixed_blocks: list[FixedBlock]
     unschedulable: list[tuple[TaskIn, str, str]]  # task, code, text
-    U: np.ndarray  # n x G suitability
+    U: np.ndarray  # n x G: P(the block happens) if it runs in that slot
     Ucs: np.ndarray  # n x (G+1) cumulative sums, for block averages
-    cap: np.ndarray  # capacity per slot
+    cap: np.ndarray  # projected mental energy per slot, 0-10
     day_states: list[DayState]
     profile: EnergyProfile
     durations: DurationModel
-    follow: FollowThroughModel
+    completion: CompletionModel
     warnings: list[str] = field(default_factory=list)
     prev_slot: list[int | None] = field(default_factory=list)  # previous plan's start slot per task, if any
     stability: float = 0.0  # 0-1, from the request
@@ -154,7 +160,7 @@ def build_problem(req: PlanRequest) -> Problem:
     unschedulable: list[tuple[TaskIn, str, str]] = []
 
     durations = DurationModel(req.outcomes, version=req.duration_version)
-    follow = FollowThroughModel(req.outcomes)
+    completion = CompletionModel(req.outcomes)
 
     def est_left(t: TaskIn) -> float:
         return max(float(t.est_minutes - t.minutes_done), 15.0)
@@ -182,6 +188,14 @@ def build_problem(req: PlanRequest) -> Problem:
             block_out(start, end)
             if rng:
                 fixed_blocks.append(FixedBlock(t, start, end, rng[0], rng[1], "locked"))
+
+    # Shared daily buffer: keep the last part of each day's free time empty, for overruns.
+    if req.day_buffer > 0:
+        for d in range(horizon):
+            idx = np.flatnonzero(free[d * npd : (d + 1) * npd])
+            k = int(math.ceil(req.day_buffer * len(idx)))
+            if k:
+                free[d * npd + idx[-k:]] = False
 
     # Free intervals, split at day boundaries.
     intervals: list[tuple[int, int]] = []
@@ -213,8 +227,9 @@ def build_problem(req: PlanRequest) -> Problem:
             continue
         est = est_left(t)
         dur = durations.for_category(t.category)
-        p80 = est if "no_probability" in req.ablations else dur.p80(est)
-        planned = ceil_to(p80, 5)
+        p80 = dur.p80(est)
+        reserved = est if "no_probability" in req.ablations else dur.quantile(est, req.reserve_quantile)
+        planned = ceil_to(reserved, 5)
         slots_p80 = max(1, math.ceil(planned / SLOT))
         slots_est = max(1, math.ceil(est / SLOT))
         # Deadline -> latest allowed end slot.
@@ -237,7 +252,7 @@ def build_problem(req: PlanRequest) -> Problem:
                 planned_minutes=planned,
                 slots_p80=slots_p80,
                 slots_est=slots_est,
-                follow=follow.for_category(t.category).p,
+                follow=completion.predict(t.category, completion.fill).p,
                 dl_end=dl_end,
             )
         )
@@ -278,25 +293,27 @@ def build_problem(req: PlanRequest) -> Problem:
             seen.add(cur.idx)
             cur = infos[cur.dep_idx]
 
-    # Energy states and the fuzzy suitability matrix.
+    # Projected energy per slot, then P(block happens) for every task and slot.
     profile = learn_profile(req.checkins)
     day_states = [state_for_day(day0 + timedelta(days=d), req.checkins, profile) for d in range(horizon)]
     n = len(infos)
-    U = np.zeros((n, G))
-    cap = np.zeros(G)
+    mental = np.zeros(G)
+    physical = np.zeros(G)
+    focus = np.zeros(G)
+    stress = np.zeros(G)
     for g in range(G):
         d = g // npd
         st = day_states[d]
         slot_time = (day_start_dt[d] + timedelta(minutes=SLOT * (g % npd))).time()
-        mental, physical = project(st, profile, slot_time)
-        c = capacity_value(round(mental, 2), round(st.focus, 2), round(st.stress, 2))
-        cap[g] = c
-        for ti in infos:
-            U[ti.idx, g] = suitability_value(
-                round(c - ti.task.mental_demand, 2), round(physical - ti.task.physical_demand, 2)
-            )
-    if "no_fuzzy" in req.ablations:
-        U[:] = 0.5  # ablation: no energy model, every slot fits every task equally
+        mental[g], physical[g] = project(st, profile, slot_time)
+        focus[g], stress[g] = st.focus, st.stress
+    cap = mental.copy()
+    if "fuzzy_reference" in req.ablations:  # evaluation only: the fuzzy score the completion model replaced
+        from .evaluation.fuzzy_reference import suitability_matrix
+
+        U = suitability_matrix(infos, mental, physical, focus, stress)
+    else:
+        U = completion_matrix(completion, infos, mental, physical, focus, stress, neutral="no_context" in req.ablations)
     Ucs = np.concatenate([np.zeros((n, 1)), np.cumsum(U, axis=1)], axis=1) if n else np.zeros((0, G + 1))
 
     prob = Problem(
@@ -317,11 +334,35 @@ def build_problem(req: PlanRequest) -> Problem:
         day_states=day_states,
         profile=profile,
         durations=durations,
-        follow=follow,
+        completion=completion,
     )
     _precheck(prob)
     _map_previous(prob)
     return prob
+
+
+def completion_matrix(model: CompletionModel, infos: list[TaskInfo], mental: np.ndarray, physical: np.ndarray,
+                      focus: np.ndarray, stress: np.ndarray, neutral: bool = False) -> np.ndarray:
+    """U[i, g] = P(task i's block happens if it starts in slot g).
+
+    neutral=True (an evaluation ablation) ignores the context: every slot gets the
+    task's average-context probability, so only the category and duration matter.
+    """
+    n, G = len(infos), len(mental)
+    if n == 0:
+        return np.zeros((0, G))
+    if neutral:
+        return np.array([[ti.follow] * G for ti in infos])
+    ctx = np.zeros((n, G, len(FEATURES)))
+    for ti in infos:
+        t = ti.task
+        ctx[ti.idx, :, 0] = 1.0
+        ctx[ti.idx, :, 1] = np.maximum(0.0, t.mental_demand - mental)
+        ctx[ti.idx, :, 2] = np.maximum(0.0, t.physical_demand - physical)
+        ctx[ti.idx, :, 3] = (focus - FOCUS_CENTRE) / FOCUS_SCALE
+        ctx[ti.idx, :, 4] = (stress - STRESS_CENTRE) / STRESS_SCALE
+        ctx[ti.idx, :, 5] = context_features(0, 0, 0, 0, FOCUS_CENTRE, STRESS_CENTRE, ti.est)[5]
+    return model.predict_matrix([ti.task.category for ti in infos], ctx)
 
 
 def _map_previous(p: Problem) -> None:

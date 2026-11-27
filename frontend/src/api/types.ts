@@ -41,8 +41,10 @@ export interface CheckIn { id: number; mental: number; physical: number; focus: 
 export interface Preferences {
   day_start: string; day_end: string; break_minutes: number; max_focus_block: number;
   no_work_after: string; ga_preset: "balanced" | "deadline" | "gentle"; horizon_days: number;
-  optimizer: Optimizer; replan_stability: number;
+  optimizer: Optimizer; replan_stability: number; simulation: SimulationTier; block_quantile: number;
 }
+
+export type SimulationTier = "quick" | "standard" | "research" | "adaptive";
 
 export type Optimizer = "ga" | "hybrid" | "cpsat";
 
@@ -53,13 +55,21 @@ export interface Robustness {
   p_all_deadlines_met: number | null; deadline_safety: number | null;
   expected_unfinished_minutes: number; p_overrun_any_day: number; p_overrun_by_day: number[];
   expected_unused_minutes: number; note: string;
+  se?: { expected_completed: number; p_all_important_done: number | null; p_all_deadlines_met: number | null;
+         deadline_safety: number | null; expected_unfinished_minutes: number };
+  adaptive?: boolean; stopped?: "fixed" | "target" | "cap"; seconds?: number;
+}
+export interface Selection {
+  chosen: string; switched: boolean; runs: number; rule: string;
+  candidates: { label: string; value: number; vs_first: number; se: number }[];
 }
 export interface StabilityReport { previous_blocks: number; kept: number; moved: number; removed: number; added: number; displacement_minutes: number }
 export interface Tradeoffs {
   objectives: Record<string, number>; pareto_optimal: boolean; dominated_by: string[]; best_at: string[]; gives_up_vs_main: string[];
 }
 
-export interface FiredRule { id: string; strength: number; text: string }
+export interface Happens { p: number; low: number; high: number; based_on: number; label: string }
+export interface Factor { factor: string; text: string; effect: number }
 
 export interface Block {
   block_id: number;
@@ -86,7 +96,8 @@ export interface Block {
   slot_mental?: number;
   slot_physical?: number;
   energy_source?: string;
-  fired_rules?: FiredRule[];
+  happens?: Happens;
+  factors?: Factor[];
   duration?: { ratio: number; spread: number; n: number; source: string; text: string; p80: number };
   p_complete?: number;
   p_on_time?: number | null;
@@ -120,6 +131,7 @@ export interface PlanVersion {
   stability?: StabilityReport | null;
   robustness?: Robustness | null;
   tradeoffs?: Tradeoffs | null;
+  selection?: Selection | null;
 }
 
 export interface DayInfo {
@@ -140,6 +152,7 @@ export interface PlanRun {
   meta: {
     now: string; horizon_days: number; day_start: string; day_end: string; slot_minutes: number;
     mode: "cold" | "personalized"; outcomes_used: number; checkins_used: number; warnings: string[]; seconds: number;
+    simulation?: { runs: number; adaptive: boolean } | null;
   };
   days: DayInfo[];
   commitments: { label: string; kind: string; start: string; end: string }[];
@@ -151,7 +164,7 @@ export interface Counts { [table: string]: Record<string, number> }
 export interface ModelsInfo {
   mode: "cold" | "personalized";
   durations: { categories: Record<string, { ratio: number; spread: number; n: number; own_n: number; source: string }>; pooled: { ratio: number; spread: number; n: number; source: string }; version?: "v1" | "v2" };
-  followthrough: Record<string, { done: number; skipped: number; p: number }>;
+  completion: { n: number; with_context: number; baseline_p: number; coefficients: Record<string, { mean: number; sd: number }> };
   profile: { bands: string[]; mental: number[]; physical: number[]; counts: number[]; learned: boolean };
   finished_with_minutes: number;
   records: Counts;
@@ -221,7 +234,7 @@ export interface MetricStat { mean: number; ci: [number, number] }
 export interface Comparison { diff: number; ci: [number, number]; p: number | null; p_holm: number | null; effect: number | null }
 export interface EvalConfigIn {
   users: number; days: number; horizon: number; seed: number; compare_horizon: boolean;
-  difficulty?: "easy" | "moderate" | "tight"; include_cpsat?: boolean; ablations?: boolean; cpsat_seconds?: number;
+  difficulty?: "easy" | "moderate" | "tight"; include_cpsat?: boolean; ablations?: boolean; selection?: boolean; buffers?: boolean; cpsat_seconds?: number;
   calibration?: boolean; stability?: boolean; solver_benchmark?: boolean;
 }
 export interface CalibrationRow { n: number; coverage: number; pinball80: number; log_score: number; mae: number; p80_padding: number }

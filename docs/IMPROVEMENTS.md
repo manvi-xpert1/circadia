@@ -1,6 +1,6 @@
-# Circadia 2.0: algorithmic improvements
+# Algorithmic improvements
 
-This file covers what changed on top of the school version, why, and how each change was checked. Measured results are in [RESULTS.md](RESULTS.md); the audit that motivated the work is in [AUDIT.md](AUDIT.md).
+This file covers the optimiser, duration, robustness and evaluation work: what each part does, why, and how it was checked. Since then, the fuzzy suitability score described here has been replaced by a learned completion model; see [CHANGELOG.md](CHANGELOG.md) and RESULTS.md, Part 1. Measured results are in [RESULTS.md](RESULTS.md); the audit that motivated the work is in [AUDIT.md](AUDIT.md).
 
 ## Headline findings
 
@@ -15,13 +15,13 @@ All on synthetic users; see RESULTS.md for every table, confidence interval and 
 | Is the new duration model better? | Calibration: yes (P80 coverage 79.1% vs 73.9%, target 80%; lower median error). Closed loop: its wider blocks finished slightly fewer tasks (3.38 vs 3.61 per day, p = 0.039). |
 | Does stability-aware replanning work? | Yes: 6.2 → 1.5 blocks changed per disruption at 50% stability (p < 0.001), for a 1% quality cost. |
 
-What this means for the next version: the planner optimises its objective well, but the objective (especially reserving P80 time) is now the bottleneck, not the search. The next experiment is the block-length quantile as a setting (P50 / P65 / P80), evaluated in the same lab.
+What this means: the planner optimises its objective well, but the objective (especially reserving P80 time) is now the bottleneck, not the search. The next experiment is the block-length quantile as a setting (P50 / P65 / P80), evaluated in the same lab.
 
 Everything still runs offline, the app's screens and API are unchanged apart from additions, and every plan from every optimiser still passes the independent hard-rule check.
 
 ---
 
-## Phase 2: Hybrid GA (GA + local search)
+## Hybrid GA (GA + local search)
 
 **Change.** After the GA finishes, its best plan is refined by best-improvement hill climbing over five neighbourhoods (`ai/ga/local_search.py`):
 
@@ -49,7 +49,7 @@ Everything still runs offline, the app's screens and API are unchanged apart fro
 
 ---
 
-## Phase 3: CP-SAT scheduler
+## CP-SAT scheduler
 
 **Change.** `ai/cpsat/scheduler.py` adds a time-indexed constraint-programming model solved by Google OR-Tools CP-SAT, as an extra optimiser (not a replacement).
 
@@ -76,7 +76,7 @@ Everything still runs offline, the app's screens and API are unchanged apart fro
 
 ---
 
-## Phase 4: Hierarchical duration model (v2)
+## Hierarchical duration model (v2)
 
 **Change.** `DurationModel(version="v2")`, now the default, is an empirical-Bayes two-level model of ln(actual / estimate).
 
@@ -93,7 +93,7 @@ Everything still runs offline, the app's screens and API are unchanged apart fro
 
 ---
 
-## Phase 5: Monte Carlo robustness of finished plans
+## Monte Carlo robustness of finished plans
 
 **Change.** `ai/uncertainty.py` replays a finished plan (default 300 runs, configurable, seeded):
 - A block happens with its category's follow-through probability.
@@ -121,7 +121,7 @@ These appear in a new "What could go wrong" tab and on every alternative.
 
 ---
 
-## Phase 6: Stability-aware replanning
+## Stability-aware replanning
 
 **Change.** A replan can carry the plan it replaces (`PlanRequest.previous`) and a stability level in [0, 1]. The fitness gains a penalty:
 
@@ -146,7 +146,7 @@ When there is a previous plan, the GA is seeded with it, with new tasks at their
 
 ---
 
-## Phase 7: Trade-offs between alternatives (instead of NSGA-II)
+## Trade-offs between alternatives (instead of NSGA-II)
 
 **Decision.** NSGA-II was not implemented.
 
@@ -167,7 +167,7 @@ Each plan is marked Pareto-optimal or dominated (with tolerances, because Monte 
 
 ---
 
-## Phase 8: Evaluation lab
+## Evaluation lab
 
 New in the closed-loop experiment (`ai/evaluation/experiment.py`):
 

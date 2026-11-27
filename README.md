@@ -4,14 +4,14 @@ The name comes from *circadian rhythm*, the daily cycle of energy and alertness 
 
 A planner that places your tasks where your energy fits. Everything is implemented in this repository, with no external AI service:
 
-- **Fuzzy logic** turns your 1–10 check-in into an expected capacity for every 15-minute slot, then scores how well each task fits each slot.
-- **Bayesian duration learning** learns how long your tasks really take, per category, shrinking sparse categories toward your overall pace (hierarchical, empirical Bayes), and how likely a planned block is to happen.
+- **A Bayesian completion model** (logistic regression with a Laplace posterior) predicts the chance each block actually happens at each time, from how far the task's demands exceed your expected energy then, your focus and stress, the block's length and your record with that kind of task. It starts from sensible priors and learns your own patterns from the outcomes you record.
+- **Bayesian duration learning** learns how long your tasks really take, per category, shrinking sparse categories toward your overall pace (hierarchical, empirical Bayes).
 - **Rule-based constraints** (hard rules H1–H9) make sure no plan ever clashes with a lecture, misses a deadline or breaks a dependency. An independent rule engine re-checks every plan from every optimiser.
 - **A hybrid genetic algorithm** searches thousands of possible plans across several days, then a local search refines the best one. A **CP-SAT** constraint solver (Google OR-Tools) is available as a thorough mode and serves as an exact-solver baseline.
-- **Monte Carlo replay** shows how a plan holds up when tasks run long or get skipped, including knock-on delays.
+- **Monte Carlo replay** shows how a plan holds up when tasks run long or get skipped, including knock-on delays, with a margin of error on every estimate.
 - **Stability-aware replanning** fits changes (an urgent task, lost time) around your existing plan instead of reshuffling it.
 
-What changed in version 2.0 and why: [docs/IMPROVEMENTS.md](docs/IMPROVEMENTS.md). Measured results: [docs/RESULTS.md](docs/RESULTS.md). The audit that started it: [docs/AUDIT.md](docs/AUDIT.md).
+Design decisions and the evidence for them: [docs/IMPROVEMENTS.md](docs/IMPROVEMENTS.md) and [docs/CHANGELOG.md](docs/CHANGELOG.md). Measured results: [docs/RESULTS.md](docs/RESULTS.md). Code reviews behind each decision: [docs/AUDIT.md](docs/AUDIT.md).
 
 Every placement comes with a plain-language explanation built from the numbers the algorithms used. The full design is in the Stage One design doc.
 
@@ -77,11 +77,17 @@ In the `backend` folder, run `.venv\Scripts\python -m app.reset_password`. Your 
 | Insights: completion, your estimates versus actual, planner learning curve, completion by energy fit and by hour, energy through the day, with a data-source filter | Built |
 | What-if simulator: late start, urgent task, lost time, lower energy, a task taking longer, combined freely; before/after comparison with explanations; apply for real | Built |
 | Evaluation lab: four schedulers plus a 1-day-horizon GA on synthetic users with hidden ground truth; confidence intervals, Wilcoxon tests, learning curve, saved runs | Built |
-| **2.0:** hybrid GA (GA + local search) as the default optimiser; CP-SAT "Thorough" mode | Built |
-| **2.0:** hierarchical Bayesian duration model with predictive (Student-t) P80 | Built |
-| **2.0:** Monte Carlo "What could go wrong" tab; Pareto labels on alternatives | Built |
-| **2.0:** stability-aware Regenerate and What-if, with a steady-vs-from-scratch comparison | Built |
-| **2.0:** lab: CP-SAT, ablations, difficulty tiers, effect sizes, Holm correction, calibration / stability / solver studies, `python -m ai.evaluation.benchmark` | Built |
+| hybrid GA (GA + local search) as the default optimiser; CP-SAT "Thorough" mode | Built |
+| hierarchical Bayesian duration model with predictive (Student-t) P80 | Built |
+| Monte Carlo "What could go wrong" tab; Pareto labels on alternatives | Built |
+| stability-aware Regenerate and What-if, with a steady-vs-from-scratch comparison | Built |
+| lab: CP-SAT, ablations, difficulty tiers, effect sizes, Holm correction, calibration / stability / solver studies, `python -m ai.evaluation.benchmark` | Built |
+| Contextual completion model in place of fuzzy suitability; planning context stored with each outcome; censoring of blocks never reached | Built |
+| Monte Carlo tiers (quick / standard / research / adaptive), standard errors, common random numbers | Built |
+| Outcome-based plan selection (built and evaluated; off by default, see results) | Built |
+| Block length as a setting (P50 / P65 / P80), P65 default from a paired experiment | Built |
+| Advanced settings section, plain-language Why panel, calibration card in Insights, anonymous pilot export | Built |
+| Browser end-to-end test (Playwright) | Built |
 
 ## Where things are
 
@@ -89,26 +95,29 @@ In the `backend` folder, run `.venv\Scripts\python -m app.reset_password`. Your 
 circaidia/
 ├── backend/
 │   ├── ai/                the AI, with no web or database code inside
-│   │   ├── fuzzy/         membership.py, engine.py (Mamdani inference), profile.py (time-of-day energy)
-│   │   ├── probability/   duration_model.py (v1 conjugate normal, v2 hierarchical Bayes), followthrough.py
+│   │   ├── probability/   completion.py (Bayesian completion model), duration_model.py (v1 conjugate normal,
+│   │   │                  v2 hierarchical Bayes), energy_profile.py (time-of-day energy), followthrough.py
 │   │   ├── rules/         hard_rules.py (H1–H9, predicate logic), soft_rules.py (A1–A8)
 │   │   ├── ga/            decoder.py, fitness.py (+ stability term), operators.py, runner.py, local_search.py
 │   │   ├── cpsat/         scheduler.py: time-indexed CP-SAT model (OR-Tools)
 │   │   ├── baselines/     the three greedy comparison schedulers
 │   │   ├── explain/       explanation templates
-│   │   ├── evaluation/    simulator.py, experiment.py, calibration.py, studies.py, benchmark.py
-│   │   ├── uncertainty.py Monte Carlo replay of a finished plan
+│   │   ├── evaluation/    simulator.py, experiment.py, compare.py, completion_study.py, calibration.py,
+│   │   │                  studies.py, benchmark.py, fuzzy_reference.py (evaluation-only comparison)
+│   │   ├── uncertainty.py Monte Carlo replay of a finished plan (tiers, standard errors, common random numbers)
+│   │   ├── selection.py   choosing the main plan by simulated outcome (off by default)
 │   │   ├── tradeoffs.py   Pareto filter over alternative plans
 │   │   ├── whatif.py      scenario simulator (stability-aware)
-│   │   ├── problem.py     builds the 15-minute grid and the suitability matrix
+│   │   ├── problem.py     builds the 15-minute grid and the completion-probability matrix
 │   │   └── pipeline.py    plan(): the single entry point, optimiser choice
 │   ├── app/               FastAPI routes, database models, login, demo data
-│   ├── tests/             pytest: 130 tests, including the design doc's worked examples and property-based tests
+│   ├── tests/             pytest: 155 tests, including the design doc's worked examples and property-based tests
 │   └── data/planner.db    your data (created on first run)
 ├── frontend/
 │   ├── src/               React + TypeScript + Tailwind source
 │   └── dist/              an optional built copy (only used by start.bat)
-├── docs/                  AUDIT.md, IMPROVEMENTS.md, RESULTS.md (+ results.json)
+├── e2e/                   browser end-to-end test (Playwright)
+├── docs/                  AUDIT.md, CHANGELOG.md, IMPROVEMENTS.md, RESULTS.md, results/ (raw experiment output)
 └── .github/workflows/     CI: backend tests + coverage, benchmark smoke run, frontend tests + build
 ```
 
@@ -123,9 +132,9 @@ pytest
 
 Current results:
 
-- 130 backend tests pass, with 97% line coverage of the AI code, plus 9 frontend tests.
+- 155 backend tests pass, with 95% line coverage of the AI code, plus 11 frontend tests and a browser end-to-end test.
 - Every optimiser (GA, hybrid, CP-SAT) is checked against the independent hard-rule engine, including Hypothesis property tests that start local search from random chromosomes.
-- The worked examples from the design doc are reproduced exactly: capacity 7.04 at 10:00 vs 6.28 at 14:00, report fit 0.89 vs 0.67, and a P80 block of 89 min (cold start) vs 91 min (learned) for a 60-minute Study estimate.
+- The worked examples from the design doc are reproduced exactly (the fuzzy ones by the evaluation reference): capacity 7.04 at 10:00 vs 6.28 at 14:00, report fit 0.89 vs 0.67, and a P80 block of 89 min (cold start) vs 91 min (learned) for a 60-minute Study estimate.
 - A randomised (Hypothesis) test feeds the decoder random chromosomes and checks the independent rule engine never finds a violation.
 - The GA scores at least as well as every baseline on random problems, and is within 0.02 of brute force on 5-task problems. The hybrid scores at least as well as the GA on every test problem.
 - A 25-task, 3-day problem plans all three styles, with Monte Carlo replay, in about 2–3 s.
@@ -138,36 +147,62 @@ python -m ai.evaluation.benchmark --out ..\docs
 
 Frontend tests: `npm test` in the `frontend` folder (needs Node.js).
 
+Browser end-to-end test (builds on the compiled frontend; uses Chrome or Playwright's Chromium):
+
+```
+cd frontend && npm run build && cd ..
+pip install -r e2e/requirements.txt
+python -m playwright install chromium
+python -m pytest e2e
+```
+
+Run it with the backend's Python environment active, or set `BACKEND_PYTHON` to that environment's `python`. To use an installed Chrome instead of downloading Chromium, set `CHROME_PATH`.
+
+Reproduce any comparison in `docs/RESULTS.md` (each takes a few minutes):
+
+```
+python -m ai.evaluation.compare hybrid,buf_p50,buf_p65 --users 20 --days 10 --difficulty tight
+```
+
 ## Notes on this build (changes from the design doc)
 
 - **Font:** IBM Plex Sans instead of Inter + Fraunces. It reads more distinctly and has clear tabular figures for times. It is bundled locally, so it works offline.
 - **Database tables:** created directly by SQLAlchemy rather than Alembic migrations, because it is simpler for one local user. Learned model values are computed from the outcome records each time rather than cached in a `model_states` table.
-- **Energy fit:** averaged over all the slots a block covers, not only its start slot, so a block that runs into the post-lunch dip is scored honestly.
+- **Chance a block happens:** averaged over all the slots a block covers, not only its start slot, so a block that runs into the post-lunch dip is scored honestly.
 - **Alternatives:** the best plan under each of the other two styles (Deadline-first, Gentle). An alternative is hidden when it places 70% or more of tasks the same way as the main plan.
 - **Plan size:** blocks are reserved in 15-minute steps, so the gap after a block works as a short natural break.
 
-## Version 2.0 results in brief
+## Results in brief
+
+From `docs/RESULTS.md` (synthetic users, 20 users × 10 days, moderate and tight workloads):
+
+- **The completion model predicts better** than per-category follow-through in a forward-only test: Brier 0.129 vs 0.134 (per-user difference CI [−0.009, −0.001]; Wilcoxon p 0.09), AUC 0.70 vs 0.58. It is pessimistic, though: it predicts 76% where 84% of blocks happen.
+- **But it doesn't plan measurably better.** Against the fuzzy score it replaced, and against itself without context, tasks done and deadline violations differ by amounts whose confidence intervals include zero. It was adopted because it produces a real probability that can be checked against outcomes and learns from them, not for a measured gain.
+- **Choosing the plan by simulated outcome made no difference** and took about four times as long, so it is off by default.
+- **Block length matters most.** Compared with P80, P65 finished 0.26 (moderate) and 0.42 (tight) more tasks a day (Holm p < 0.001), without a significant rise in overruns into lectures. P50 finished even more but did overrun into lectures significantly more often. The app now defaults to P65.
+
+## Optimiser and duration-model results
 
 From `docs/RESULTS.md` (synthetic users, 12 users × 7 days per workload, seed 2026; full tables with confidence intervals there):
 
 - **Solver quality.** On 20–40-task problems the hybrid GA + local search found the best plan of any optimiser on 14 of 15 problems, in about 1 s. The plain GA was 2–3% behind. CP-SAT proved optimality on all five 10-task problems but, under a 10 s limit on 2 CPU threads, fell 9% behind at 30–40 tasks. Every plan from every optimiser passed the independent hard-rule check.
 - **Real outcomes.** The hybrid's better fitness did not translate into measurably better outcomes for the simulated users: against the plain GA, every paired difference was small and non-significant. Better optimisation of the planner's objective is not the same as a better day.
-- **What actually limits task completion is the P80 block length.** Removing learned durations (planning with the user's own estimate) finished about 1 more task per day (4.33 vs 3.38, p = 0.004 after Holm correction). It also cut deadline violations from 14% to 6% (not significant after correction), at the cost of more overruns into lectures. This explains the school version's "priority finishes more tasks" result: reserving P80 time protects against overruns, but the simulated users don't reuse the padding.
+- **What actually limits task completion is the P80 block length.** Removing learned durations (planning with the user's own estimate) finished about 1 more task per day (4.33 vs 3.38, p = 0.004 after Holm correction). It also cut deadline violations from 14% to 6% (not significant after correction), at the cost of more overruns into lectures. This explains why the simple priority baseline finished more tasks than the GA: reserving P80 time protects against overruns, but the simulated users don't reuse the padding.
 - **Duration model v2** is better calibrated: P80 covers 79.1% of real durations against v1's 73.9% (target 80%), with lower median error. But its wider blocks finished slightly fewer tasks in the closed loop (3.38 vs 3.61 per day, p = 0.039). The model is more accurate; the decision to reserve P80 is what costs tasks.
 - **Stability-aware replanning** cut the blocks changed by a disruption from 6.2 to 1.5 (p < 0.001) at 50% stability, for a 1% drop in plan quality. Urgent-task placement was unchanged up to 50% and fell at 100% (55.6% → 44.4%).
 
-These are trade-offs to discuss, not results to hide. The natural next experiment is the block-length quantile (P50 / P65 / P80) as a setting.
+These are trade-offs to discuss, not results to hide. The block-length experiment this pointed to is in Results in brief, above.
 
 ## The evaluation, honestly
 
-The Evaluation lab runs on **synthetic users**, labelled as such everywhere. Each user has hidden habits the planner never sees: true overruns per category, a morning or evening rhythm, and a follow-through rate. Plans are graded by a simple "true fit" formula that is deliberately not the planner's fuzzy model. Assumptions, all shown in the lab:
+The Evaluation lab runs on **synthetic users**, labelled as such everywhere. Each user has hidden habits the planner never sees: true overruns per category, a morning or evening rhythm, and a follow-through rate. Plans are graded by a simple "true fit" formula that is deliberately not the planner's own completion model. Assumptions, all shown in the lab:
 
 - The user plans at 08:30 and again at 14:00.
 - A free user starts the next block up to 30 minutes early.
 - An overrun into a lecture pauses until the lecture ends.
 - Work stops at 22:00.
 
-What the default run shows (10 users × 7 days, seed 2026):
+What the benchmark run showed (10 users × 7 days, seed 2026; slots scored by the fuzzy suitability score, which the completion model has since replaced):
 
 - Among the four main schedulers, the GA had the fewest overloaded days: about 6% of days planned above 85% load, against 13% for fuzzy, 16% for priority and 40% for duration-aware.
 - The GA almost never overran past 22:00 (about 0.1 minute a day). The priority scheduler overran by about 11 minutes a day.

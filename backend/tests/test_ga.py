@@ -89,7 +89,9 @@ def test_report_goes_to_the_morning_and_errand_to_the_afternoon():
     req = PlanRequest(NOW, [report, errand], commits, [CheckIn(NOW, 6.5, 5, 6, 4)], [], Preferences(horizon_days=1))
     out = plan(req, alternatives=False)
     blocks = {b["task_id"]: b for b in out["plans"][0]["blocks"]}
-    assert blocks[1]["start"].startswith("2026-11-11T10") and blocks[1]["fit"] >= 0.85
+    # The report goes where projected mental energy covers its demand; with no history the
+    # completion model is its prior, so the probability is moderate, not near-certain.
+    assert blocks[1]["start"].startswith("2026-11-11T10") and blocks[1]["fit"] >= 0.7
     assert blocks[2]["start"].startswith("2026-11-11T14")
 
 

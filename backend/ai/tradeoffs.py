@@ -6,7 +6,7 @@ This module compares them on separate objectives without adding them up:
 
   completion   expected tasks finished (Monte Carlo)
   deadlines    share of tasks due in the horizon that finish on time (Monte Carlo)
-  energy       weighted mean energy fit of placed blocks
+  energy       weighted mean chance that placed blocks happen at their times
   calm         1 - the busiest day's load
   stability    1 - the stability penalty (only when replanning against a previous plan)
 
@@ -25,7 +25,7 @@ from __future__ import annotations
 OBJECTIVES = {
     "completion": "Expected tasks finished",
     "deadlines": "Deadlines met",
-    "energy": "Energy fit",
+    "energy": "Blocks likely to happen",
     "calm": "Lighter busiest day",
     "stability": "Keeps your existing plan",
 }

@@ -71,8 +71,18 @@ export function Badge({ tone = "muted", children, className, title }: { tone?: T
   );
 }
 
+/** Plans saved before the completion model used fuzzy-fit labels; show them in the nearest band. */
+const OLD_FIT_LABELS: Record<string, string> = { Excellent: "Very likely", Good: "Likely", Fair: "Uncertain", Poor: "Unlikely" };
+
+/** Colour of the thin bar beside a planned block. */
+export function fitBar(label?: string) {
+  const bars: Record<string, string> = { teal: "bg-teal", sage: "bg-sage", warn: "bg-warn", danger: "bg-danger" };
+  return bars[fitTone(label)] ?? "bg-warn";
+}
+
 export function fitTone(label?: string): Tone {
-  return label === "Excellent" ? "teal" : label === "Good" ? "sage" : label === "Fair" ? "warn" : "danger";
+  const l = OLD_FIT_LABELS[label ?? ""] ?? label;
+  return l === "Very likely" ? "teal" : l === "Likely" ? "sage" : l === "Uncertain" ? "warn" : "danger";
 }
 
 export const priorityTone = (p?: number): Tone => (p === 4 ? "danger" : p === 3 ? "brown" : p === 2 ? "muted" : "muted");

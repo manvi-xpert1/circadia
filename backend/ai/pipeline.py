@@ -1,7 +1,7 @@
 """The one entry point: plan(request) -> a plan with explanations.
 
 Order of work (design section 3.4, data flow):
-  rule pre-check -> probability (P80, P(complete)) -> fuzzy matrix U
+  rule pre-check -> predictions (durations; U = P(block happens) per task and slot)
   -> genetic algorithm (main preset + alternatives) -> final hard-rule check
   -> explanations
 """
@@ -18,6 +18,7 @@ from .rules import soft_rules as sr
 from .rules.hard_rules import FactBase, PlacedBlock, check_hard
 from .tradeoffs import annotate
 from .types import PlanRequest
+from .selection import Candidate, select
 from .uncertainty import MCConfig, simulate_plan
 
 SIMILARITY_LIMIT = 0.70
@@ -123,7 +124,7 @@ def describe_plan(p: Problem, res: GAResult, preset: str, mc: MCConfig | None = 
         "optimizer_label": OPTIMIZERS.get(res.optimizer, res.optimizer),
         "optimizer_details": res.details,
         "stability": stability_report(p, res.decoded.starts),
-        "robustness": simulate_plan(p, res.decoded.starts, mc) if mc is not None and mc.runs > 0 else None,
+        "robustness": simulate_plan(p, res.decoded.starts, mc) if mc is not None else None,
         "blocks": blocks,
         "unscheduled": explain_unscheduled(p, res, preset),
         "day_load": [
@@ -153,32 +154,54 @@ def fixed_items(p: Problem) -> list[dict]:
 
 
 def plan(req: PlanRequest, config: GAConfig | None = None, alternatives: bool = True,
-         optimizer: str | None = None, mc_runs: int = 300) -> dict:
+         optimizer: str | None = None, mc_runs: int | None = None) -> dict:
     """Plan the horizon.
 
     optimizer: "ga" (original), "hybrid" (default: GA + local search) or "cpsat"
                (hybrid, then CP-SAT; only the main plan uses the solver, to keep it quick).
-    mc_runs:   Monte Carlo replays per plan for the robustness estimates (0 turns them off).
+    mc_runs:   fixed number of Monte Carlo replays per plan, overriding req.simulation
+               (0 turns robustness estimates and outcome-based selection off).
+    alternatives: also optimise for the other presets. Those plans, and a second seed of
+               the user's preset, are candidates for the main plan, which is chosen by
+               simulated outcome when req.select_by_outcome is set (see ai.selection).
     """
     t0 = time.perf_counter()
     p = build_problem(req)
     opt = optimizer or getattr(req, "optimizer", None) or DEFAULT_OPTIMIZER
     if opt not in OPTIMIZERS:
         raise ValueError(f"Unknown optimizer {opt!r}; choose one of {', '.join(OPTIMIZERS)}")
-    mc = MCConfig(runs=mc_runs, seed=req.seed)
+    mc = MCConfig(runs=mc_runs, seed=req.seed) if mc_runs is not None else MCConfig.tier(req.simulation, req.seed)
+    simulate = mc.adaptive or mc.runs > 0
     main_preset = req.prefs.preset if req.prefs.preset in PRESETS else "balanced"
     main = optimise(p, main_preset, req.seed, opt, config)
     verify(p, main)
-    plans = [describe_plan(p, main, main_preset, mc)]
+    results: list[tuple[str, str, GAResult]] = [(main_preset, f"{PRESET_LABELS[main_preset]}, seed {req.seed}", main)]
+    alts: list[tuple[str, GAResult]] = []
     if alternatives:
+        alt_opt = "hybrid" if opt == "cpsat" else opt
         for preset in PRESETS:
             if preset == main_preset:
                 continue
-            alt = optimise(p, preset, req.seed, "hybrid" if opt == "cpsat" else opt, config)
+            alt = optimise(p, preset, req.seed, alt_opt, config)
             verify(p, alt)
-            if similarity(main, alt) < SIMILARITY_LIMIT:
-                plans.append(describe_plan(p, alt, preset, mc))
-    if mc.runs > 0:
+            alts.append((preset, alt))
+            results.append((preset, f"{PRESET_LABELS[preset]} plan", alt))
+        if simulate and req.select_by_outcome:
+            reseed = optimise(p, main_preset, req.seed + 1, alt_opt, config)
+            verify(p, reseed)
+            results.insert(1, (main_preset, f"{PRESET_LABELS[main_preset]}, seed {req.seed + 1}", reseed))
+    selection = None
+    chosen = main
+    if simulate and req.select_by_outcome and len(results) > 1:
+        k, selection = select(p, [Candidate(label, r.decoded.starts) for _, label, r in results], main_preset, mc)
+        chosen = results[k][2]
+    first = describe_plan(p, chosen, main_preset, mc if simulate else None)
+    first["selection"] = selection
+    plans = [first]
+    for preset, alt in alts:
+        if alt is not chosen and similarity(chosen, alt) < SIMILARITY_LIMIT:
+            plans.append(describe_plan(p, alt, preset, mc if simulate else None))
+    if simulate:
         annotate(plans)
 
     days = []
@@ -205,6 +228,7 @@ def plan(req: PlanRequest, config: GAConfig | None = None, alternatives: bool = 
             "slot_minutes": SLOT,
             "seed": req.seed,
             "optimizer": opt,
+            "simulation": {"runs": first["robustness"]["runs"], "adaptive": mc.adaptive} if first.get("robustness") else None,
             "version": VERSION,
             "stability_weight": p.stability if p.has_previous else None,
             "mode": "personalized" if n_out >= 3 else "cold",

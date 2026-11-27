@@ -1,8 +1,122 @@
 # Circadia benchmark results
 
-Generated 2026-11-12 10:22 by `python -m ai.evaluation.benchmark` in 15.1 min on Linux-6.18.44-fc-v378-x86_64-with-glibc2.39 (2 CPU threads).
+**All data is synthetic.** Synthetic users have hidden habits (true overrun per category, a daily energy curve, a follow-through rate) that the planner never sees. Plans are graded against that hidden truth, not against the planner's own models.
 
-**All data is synthetic.** Synthetic users have hidden habits (true overrun per category, a daily energy curve, a follow-through rate) that the planner never sees. Plans are graded against that hidden truth, not against the planner's own models. Numbers are means over users with 95% bootstrap confidence intervals.
+This file has two parts:
+
+1. **Scoring, plan selection and block length**: the completion model against the fuzzy suitability score it replaced, plan selection by simulated outcome, and block length. Each experiment's full output, including per-user values, is in `docs/results/`, with the command that reproduces it.
+2. **Optimisers and duration models**, produced by `python -m ai.evaluation.benchmark` with slots scored by fuzzy suitability and blocks reserved at P80. Its comparisons of optimisers and duration models still describe those components; its scheduler named "Energy-aware fuzzy" is now "Energy-aware greedy".
+
+---
+
+# Part 1: Scoring, plan selection and block length
+
+Closed-loop runs: 20 synthetic users × 10 days, 3-day horizon, seed 2026, on moderate (4–7 new tasks a day) and tight (7–10 new tasks a day, more lectures) workloads. Every policy sees identical users, tasks, lectures and check-ins (paired design). The reference `hybrid` is the full planner (GA + local search) with the completion model and blocks reserved at P80, as the planner library uses by default. Reproduce any table with `python -m ai.evaluation.compare <names> --users 20 --days 10 --difficulty <workload>` in `backend/`.
+
+## 1. Does the completion model predict better than what it replaced?
+
+Prequential (forward-only) test: each user's outcomes are predicted in order, every model trained only on that user's earlier outcomes, so no future information leaks into a prediction. 12 users × 10 days, 544 outcomes (`docs/results/completion_study.json`; `ai.evaluation.completion_study`). Lower Brier, log loss and ECE are better; higher AUC is better.
+
+| Model | Brier | Log loss | ECE (calibration error) | AUC (ranking) | Mean predicted vs observed |
+|---|---|---|---|---|---|
+| Constant rate (Beta(4, 1) prior, pooled) | 0.1342 | 0.4374 | 0.051 | 0.570 | 0.827 vs 0.844 |
+| Category follow-through (the previous model) | 0.1340 | 0.4374 | **0.038** | 0.584 | 0.811 vs 0.844 |
+| **Contextual completion model** (adopted) | **0.1293** | **0.4209** | 0.083 | **0.697** | 0.764 vs 0.844 |
+| Contextual, flat prior (no expert prior on energy) | 0.1312 | 0.4272 | 0.064 | 0.654 | 0.780 vs 0.844 |
+
+- **Better overall accuracy and much better ranking.** Contextual minus category Brier, per user: −0.0046, 95% CI [−0.0094, −0.0006]; Wilcoxon p = 0.092; 7 of 12 users better. The CI excludes zero but the rank test is not significant at 0.05, so this is a modest, not a decisive, improvement.
+- **The gap grows with history.** With 30 or more past outcomes: Brier 0.134 against 0.144 for the category model; AUC 0.68 against 0.59. With fewer than 10 the contextual model is slightly worse (0.139 against 0.137).
+- **Worse calibration, in one direction: it is pessimistic.** It predicts 76% where 84% of blocks happen, most of all at cold start (70% against 83% with 0–9 outcomes). The cause is the prior: an 80% baseline plus the energy-shortfall penalty carried over from the fuzzy rules. The expert prior helps ranking (AUC 0.70 against 0.65 with a flat prior) but costs calibration (ECE 0.083 against 0.064). This is the first thing a real pilot should check (Insights shows a calibration table from the user's own outcomes).
+- **Limitation.** The category model is no better than a constant here because the simulated users have no per-category follow-through. That is a property of the simulator, not evidence that categories never matter.
+
+## 2. Does it plan better? (closed loop)
+
+Same planner, three ways of scoring a slot: the completion model (`hybrid`), the fuzzy suitability score it replaced (`abl_fuzzy`, kept in `ai/evaluation/fuzzy_reference.py` for this test only) and the completion model with context switched off (`abl_no_context`).
+
+**Moderate workload** (20 users × 10 days, seed 2026). Means; for each alternative, the paired difference from `hybrid` (alternative minus reference) with its 95% bootstrap CI and Holm-adjusted Wilcoxon p.
+
+| Policy | Tasks done / day | Deadline violations % | Past day end, min/day | True energy fit |
+|---|---|---|---|---|
+| GA + local search (`hybrid`) | 3.80 | 8.1 | 0.08 | 0.851 |
+| Hybrid with fuzzy suitability instead of the completion model (`abl_fuzzy`) | 3.83<br>Δ +0.04 [-0.07, +0.14], p 0.999 | 9.0<br>Δ +1.0 [-0.9, +2.7], p 0.395 | 0.00<br>Δ -0.08 [-0.23, -0.00], p 0.317 | 0.861<br>Δ +0.010 [+0.001, +0.019], p 0.097 |
+| Hybrid without context (completion by category only) (`abl_no_context`) | 3.83<br>Δ +0.03 [-0.09, +0.14], p 0.999 | 8.3<br>Δ +0.3 [-1.4, +2.1], p 0.985 | 0.22<br>Δ +0.14 [-0.00, +0.35], p 0.218 | 0.841<br>Δ -0.010 [-0.024, +0.004], p 0.231 |
+
+**Tight workload** (20 users × 10 days, seed 2026). Means; for each alternative, the paired difference from `hybrid` (alternative minus reference) with its 95% bootstrap CI and Holm-adjusted Wilcoxon p.
+
+| Policy | Tasks done / day | Deadline violations % | Past day end, min/day | True energy fit |
+|---|---|---|---|---|
+| GA + local search (`hybrid`) | 3.94 | 23.3 | 0.19 | 0.859 |
+| Hybrid with fuzzy suitability instead of the completion model (`abl_fuzzy`) | 4.00<br>Δ +0.06 [-0.03, +0.14], p 0.638 | 23.2<br>Δ -0.2 [-2.6, +2.2], p 0.936 | 0.20<br>Δ +0.01 [-0.02, +0.05], p 0.655 | 0.870<br>Δ +0.011 [-0.007, +0.028], p 0.624 |
+| Hybrid without context (completion by category only) (`abl_no_context`) | 4.04<br>Δ +0.09 [-0.05, +0.22], p 0.638 | 20.8<br>Δ -2.5 [-5.5, +0.5], p 0.368 | 0.31<br>Δ +0.12 [-0.01, +0.36], p 0.570 | 0.857<br>Δ -0.002 [-0.016, +0.013], p 0.624 |
+
+
+**Finding: no detectable difference in outcomes.** Every confidence interval for tasks done and deadline violations includes zero, and no Holm-adjusted p is below 0.09. The fuzzy score matched slightly better on the simulator's hidden "true fit" (moderate +0.010, CI [+0.001, +0.019], Holm p 0.097). That is unsurprising: the hidden fit formula is, like the fuzzy rules, a hand-written function of energy shortfall.
+
+**Decision: adopt the completion model anyway, for reasons other than closed-loop outcomes.** It predicts better (section 1). It outputs a genuine probability, one that can be checked against outcomes (section 1 shows where it is off) and that the Monte Carlo replay can use directly; the fuzzy 0–1 score is not a probability, and the replay previously had to treat it as one. And it learns each user's own sensitivity to energy, focus, stress and block length from outcomes, where the fuzzy rules were fixed. The honest summary: the change is about correctness and learnability, not a measured gain in tasks completed.
+
+## 3. Does choosing the plan by simulated outcome help?
+
+`hybrid_select` produces four candidate plans (Balanced with two seeds, Deadline-first, Gentle), replays each 100 times against the same random draws (common random numbers), and keeps the fitness-best plan unless another candidate beats it on the simulated outcome score by more than two standard errors (`ai/selection.py`).
+
+**Moderate workload** (20 users × 10 days, seed 2026). Means; for each alternative, the paired difference from `hybrid` (alternative minus reference) with its 95% bootstrap CI and Holm-adjusted Wilcoxon p.
+
+| Policy | Tasks done / day | Deadline violations % | Overruns into lectures / day | Past day end, min/day | Planning s / plan |
+|---|---|---|---|---|---|
+| GA + local search (`hybrid`) | 3.80 | 8.1 | 1.77 | 0.08 | 0.57 |
+| Hybrid, main plan chosen by simulated outcome (`hybrid_select`) | 3.77<br>Δ -0.03 [-0.14, +0.09], p 0.500 | 8.1<br>Δ +0.0 [-1.5, +1.6], p 0.910 | 1.69<br>Δ -0.09 [-0.20, +0.01], p 0.103 | 0.00<br>Δ -0.08 [-0.23, -0.00], p 0.317 | 2.29 |
+
+**Tight workload** (20 users × 10 days, seed 2026). Means; for each alternative, the paired difference from `hybrid` (alternative minus reference) with its 95% bootstrap CI and Holm-adjusted Wilcoxon p.
+
+| Policy | Tasks done / day | Deadline violations % | Overruns into lectures / day | Past day end, min/day | Planning s / plan |
+|---|---|---|---|---|---|
+| GA + local search (`hybrid`) | 3.94 | 23.3 | 2.21 | 0.19 | 0.69 |
+| Hybrid, main plan chosen by simulated outcome (`hybrid_select`) | 3.90<br>Δ -0.04 [-0.16, +0.07], p 1.000 | 24.0<br>Δ +0.7 [-1.8, +3.5], p 0.756 | 2.16<br>Δ -0.04 [-0.14, +0.06], p 0.442 | 0.23<br>Δ +0.04 [-0.02, +0.14], p 0.655 | 2.73 |
+
+
+**Finding: no measurable benefit, about four times the planning time.** Every difference is small with a CI spanning zero. **Decision: off by default** (`PlanRequest.select_by_outcome = False`). Monte Carlo still runs on every plan to report risk; it just doesn't choose the plan. A likely reason: the optimiser already accounts for the main risk (blocks too short) through P(duration fits), and the alternatives it produces are rarely different enough to matter.
+
+## 4. Block length: P80, P65, P50 and a shared buffer
+
+How long each block reserves: the 50th, 65th or 80th percentile of the predicted duration, optionally with a share of each day's free time held back as a shared buffer at the end of the day (`PlanRequest.reserve_quantile`, `day_buffer`).
+
+**Moderate workload** (20 users × 10 days, seed 2026). Means; for each alternative, the paired difference from `hybrid` (alternative minus reference) with its 95% bootstrap CI and Holm-adjusted Wilcoxon p.
+
+| Policy | Tasks done / day | Deadline violations % | Overruns into lectures / day | Past day end, min/day |
+|---|---|---|---|---|
+| GA + local search (`hybrid`) | 3.80 | 8.1 | 1.77 | 0.08 |
+| Blocks at P50 (median) (`buf_p50`) | 4.15<br>Δ +0.35 [+0.26, +0.44], p <0.001 | 5.1<br>Δ -2.9 [-5.0, -0.8], p 0.052 | 1.94<br>Δ +0.17 [+0.09, +0.25], p 0.014 | 0.80<br>Δ +0.73 [+0.05, +1.45], p 0.364 |
+| Blocks at P65 (`buf_p65`) | 4.06<br>Δ +0.26 [+0.17, +0.36], p <0.001 | 6.9<br>Δ -1.2 [-3.2, +0.9], p 0.439 | 1.83<br>Δ +0.06 [-0.03, +0.17], p 0.457 | 0.23<br>Δ +0.15 [-0.15, +0.61], p 1.000 |
+| Blocks at P50 + 15% shared daily buffer (`buf_p50_shared`) | 4.04<br>Δ +0.24 [+0.14, +0.35], p 0.003 | 6.3<br>Δ -1.7 [-3.9, +0.4], p 0.252 | 1.87<br>Δ +0.10 [+0.01, +0.19], p 0.196 | 0.12<br>Δ +0.05 [-0.23, +0.34], p 1.000 |
+| Blocks at P65 + 10% shared daily buffer (`buf_p65_shared`) | 3.90<br>Δ +0.10 [-0.02, +0.20], p 0.107 | 8.6<br>Δ +0.6 [-1.5, +2.9], p 0.796 | 1.73<br>Δ -0.04 [-0.17, +0.09], p 0.457 | 0.00<br>Δ -0.08 [-0.23, -0.00], p 0.952 |
+
+**Tight workload** (20 users × 10 days, seed 2026). Means; for each alternative, the paired difference from `hybrid` (alternative minus reference) with its 95% bootstrap CI and Holm-adjusted Wilcoxon p.
+
+| Policy | Tasks done / day | Deadline violations % | Overruns into lectures / day | Past day end, min/day |
+|---|---|---|---|---|
+| GA + local search (`hybrid`) | 3.94 | 23.3 | 2.21 | 0.19 |
+| Blocks at P50 (median) (`buf_p50`) | 4.73<br>Δ +0.79 [+0.64, +0.95], p <0.001 | 15.5<br>Δ -7.9 [-10.4, -5.5], p <0.001 | 2.54<br>Δ +0.34 [+0.20, +0.46], p 0.003 | 1.07<br>Δ +0.88 [+0.48, +1.34], p 0.009 |
+| Blocks at P65 (`buf_p65`) | 4.37<br>Δ +0.42 [+0.30, +0.54], p <0.001 | 18.7<br>Δ -4.6 [-7.5, -1.4], p 0.032 | 2.35<br>Δ +0.14 [+0.03, +0.26], p 0.058 | 0.28<br>Δ +0.08 [-0.42, +0.53], p 0.635 |
+| Blocks at P50 + 15% shared daily buffer (`buf_p50_shared`) | 4.21<br>Δ +0.26 [+0.16, +0.34], p <0.001 | 19.5<br>Δ -3.8 [-6.2, -1.4], p 0.032 | 2.42<br>Δ +0.21 [+0.07, +0.34], p 0.024 | 0.19<br>Δ -0.01 [-0.02, -0.00], p 0.635 |
+| Blocks at P65 + 10% shared daily buffer (`buf_p65_shared`) | 4.12<br>Δ +0.17 [+0.06, +0.28], p 0.010 | 20.3<br>Δ -3.0 [-5.7, -0.3], p 0.064 | 2.38<br>Δ +0.17 [+0.04, +0.29], p 0.058 | 0.00<br>Δ -0.19 [-0.56, -0.00], p 0.539 |
+
+
+**Findings.**
+- Shorter blocks finish more tasks and miss fewer deadlines, and the effect grows with workload. On the tight workload P50 finished +0.79 tasks a day and cut deadline violations from 23% to 15% (both Holm p < 0.001).
+- The price is overruns into lectures: P50 added 0.17 (moderate) and 0.34 (tight) per day, both significant. It also ran past the end of the day more often (about 1 minute a day on the tight workload).
+- P65 gains on both workloads (+0.26 and +0.42 tasks a day, both p < 0.001). Its increase in lecture overruns is smaller and not significant after correction (+0.06, p 0.46; +0.14, p 0.058).
+- A shared buffer did not clearly beat simply choosing a lower quantile. P65 alone finished as many or more tasks than P50 + 15% buffer on both workloads, with fewer lecture overruns. The buffered P50 was slightly better on moderate-workload deadlines (6.3% against 6.9%) and on minutes past the end of the day; none of these differences between the two is large.
+
+**Decision: the app reserves blocks at P65 by default** (Settings → Advanced → Block length, with P50 and P80 as options). The planner library's default stays at P80 so its documented worked examples remain exact. Caveat: the simulated user starts the next block up to 30 minutes early when free, which makes shorter blocks cheaper than they may be in real life; a pilot should check the overrun rate.
+
+## 5. Monte Carlo precision and speed
+
+Every estimate now comes with its standard error, and replays use common random numbers: each task has its own random stream, so different plans are compared against the same luck. Tiers: quick (30 runs), standard (100), research (300), and adaptive (30 upward, stopping once the standard error of expected completed tasks is below 0.1). Replays of a plan take milliseconds; most planning time is the optimiser. Replayed durations are truncated at 4× the user's estimate. Without that, the heavy-tailed cold-start distribution (Student-t, 3 degrees of freedom on the log scale) produced 400-hour blocks that dominated averages.
+
+---
+
+# Part 2: Optimisers and duration models
+
+Generated 2026-11-12 10:22 by `python -m ai.evaluation.benchmark` in 15.1 min on Linux-6.18.44-fc-v378-x86_64-with-glibc2.39 (2 CPU threads).
 
 ## Closed-loop comparison: easy workload
 

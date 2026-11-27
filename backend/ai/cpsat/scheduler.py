@@ -130,7 +130,7 @@ def _solve_round(p, preset, cand, lengths, W_s, N_s, hint, cfg, budget, info):
             day_terms[s // p.npd].append((v, L * SLOT))
             coef = w["pri"] * weights[i] * DAY_DISCOUNT ** (s // p.npd) / W_all
             coef += w["en"] * weights[i] * fits[k] / W_s
-            coef += w["dur"] * weights[i] * p.tasks[i].p_complete / W_s
+            coef += w["dur"] * weights[i] * p.tasks[i].p_fits / W_s
             coef += w["pref"] * (0.0 if late[k] else 1.0) / N_s
             if i in due_set:
                 coef += w["dl"] * float(on_time[i, s]) / n_due

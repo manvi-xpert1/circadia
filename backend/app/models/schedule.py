@@ -70,6 +70,9 @@ class TaskOutcome(Base):
     actual_minutes: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     recorded_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     source: Mapped[str] = mapped_column(String(10), default="user")
+    # What the planner knew when it placed the block (the completion model's inputs).
+    # Empty when the block was moved after planning, since the saved context no longer applies.
+    context_json: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
 
 
 class Feedback(Base):

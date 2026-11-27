@@ -29,13 +29,13 @@ from typing import Callable
 import numpy as np
 from scipy.stats import wilcoxon
 
-from ..baselines.schedulers import duration_aware, fuzzy_greedy, priority_deadline
+from ..baselines.schedulers import duration_aware, energy_greedy, priority_deadline
 from ..ga.decoder import Decoded
 from ..ga.local_search import LSConfig
 from ..ga.runner import GAConfig, run_ga, run_hybrid
 from ..problem import SLOT, Problem, build_problem
 from ..rules.hard_rules import FactBase, PlacedBlock, check_hard
-from ..types import CheckIn, Commitment, Outcome, PlanRequest, Preferences, TaskIn
+from ..types import CheckIn, Commitment, Outcome, OutcomeContext, PlanRequest, Preferences, TaskIn
 from .simulator import DAY_END, SyntheticUser, TrueState
 
 EVAL_GA = GAConfig(population=40, generations=60, patience=12)
@@ -46,17 +46,27 @@ REPLAN_AT = [time(8, 30), time(14, 0)]  # assumption: the user regenerates the p
 SCHEDULERS = {
     "priority": "Priority / deadline",
     "duration": "Duration-aware",
-    "fuzzy": "Energy-aware fuzzy",
+    "energy": "Energy-aware greedy",
     "ga": "Constraint-aware GA",
     "hybrid": "GA + local search",
     "cpsat": "CP-SAT solver",
     "ga_1day": "GA, 1-day horizon",
     # Ablations of the full system (GA + local search, hierarchical durations).
-    "abl_no_fuzzy": "Hybrid without fuzzy energy fit",
+    "abl_no_context": "Hybrid without context (completion by category only)",
+    "abl_fuzzy": "Hybrid with fuzzy suitability instead of the completion model",
     "abl_no_prob": "Hybrid without learned durations",
     "abl_v1_durations": "Hybrid with the original duration model",
+    # Plan selection: fitness-best hybrid plan (A, the reference) vs best simulated outcome (B).
+    "hybrid_select": "Hybrid, main plan chosen by simulated outcome",
+    # Buffer policies: how long each block is reserved for, and a shared slack at the end of each day.
+    "buf_p50": "Blocks at P50 (median)",
+    "buf_p65": "Blocks at P65",
+    "buf_p50_shared": "Blocks at P50 + 15% shared daily buffer",
+    "buf_p65_shared": "Blocks at P65 + 10% shared daily buffer",
 }
-ABLATIONS = ["abl_no_fuzzy", "abl_no_prob", "abl_v1_durations"]
+ABLATIONS = ["abl_no_context", "abl_fuzzy", "abl_no_prob", "abl_v1_durations"]
+SELECTION = ["hybrid_select"]
+BUFFERS = ["buf_p50", "buf_p65", "buf_p50_shared", "buf_p65_shared"]
 REFERENCE = "hybrid"  # the scheduler every other one is compared with
 
 # Difficulty tiers: (new tasks per day, classes per day).
@@ -92,6 +102,8 @@ class EvalConfig:
     include_cpsat: bool = False  # slow: one solver call per plan
     cpsat_seconds: float = 2.0
     ablations: bool = False
+    selection: bool = False  # add the outcome-selection scheduler
+    buffers: bool = False  # add the buffer-policy variants
 
 
 @dataclass
@@ -125,12 +137,19 @@ def _draw(seed: int, tid: int, day: int, kind: str) -> random.Random:
 
 def _request_options(name: str) -> dict:
     """PlanRequest fields that differ for a scheduler (ablations change the problem, not the optimiser)."""
-    if name == "abl_no_fuzzy":
-        return {"ablations": ("no_fuzzy",)}
+    if name == "abl_no_context":
+        return {"ablations": ("no_context",)}
+    if name == "abl_fuzzy":
+        return {"ablations": ("fuzzy_reference",)}
     if name == "abl_no_prob":
         return {"ablations": ("no_probability",)}
     if name == "abl_v1_durations":
         return {"duration_version": "v1"}
+    buffers = {"buf_p50": (0.5, 0.0), "buf_p65": (0.65, 0.0), "buf_p50_shared": (0.5, 0.15),
+               "buf_p65_shared": (0.65, 0.10)}
+    if name in buffers:
+        q, b = buffers[name]
+        return {"reserve_quantile": q, "day_buffer": b}
     return {}
 
 
@@ -141,8 +160,8 @@ def _plan(name: str, p: Problem, seed: int, cfg: EvalConfig | None = None) -> tu
         return priority_deadline(p), True, False
     if name == "duration":
         return duration_aware(p), False, False
-    if name == "fuzzy":
-        return fuzzy_greedy(p), False, False
+    if name == "energy":
+        return energy_greedy(p), False, False
     if name == "cpsat":
         from ..cpsat.scheduler import CPSATConfig, run_cpsat
 
@@ -151,7 +170,24 @@ def _plan(name: str, p: Problem, seed: int, cfg: EvalConfig | None = None) -> tu
         return res.decoded, False, bool(res.details.get("cpsat", {}).get("fallback"))
     if name in ("ga", "ga_1day"):
         return run_ga(p, "balanced", seed, EVAL_GA).decoded, False, False
+    if name == "hybrid_select":
+        from ..selection import Candidate, select
+        from ..uncertainty import MCConfig
+
+        cands = [("balanced", seed), ("balanced", seed + 1), ("deadline", seed), ("gentle", seed)]
+        runs = [run_hybrid(p, pr, sd, EVAL_GA, EVAL_LS).decoded for pr, sd in cands]
+        k, _ = select(p, [Candidate(f"{pr}/{sd}", d.starts) for (pr, sd), d in zip(cands, runs)], "balanced",
+                      MCConfig(runs=100, seed=seed))
+        return runs[k], False, False
     return run_hybrid(p, "balanced", seed, EVAL_GA, EVAL_LS).decoded, False, False
+
+
+def block_context(p: Problem, i: int, s: int) -> OutcomeContext:
+    """The completion model's inputs for task i starting at slot s, as known when the plan was made."""
+    t = p.tasks[i].task
+    m, ph = p.slot_energy(s)
+    st = p.day_states[p.day_of(s)]
+    return OutcomeContext(p.slot_dt(s), t.mental_demand, t.physical_demand, m, ph, st.focus, st.stress)
 
 
 def _plan_violations(p: Problem, dec: Decoded, use_est: bool) -> int:
@@ -181,6 +217,7 @@ class UserResult:
     plans: int = 0
     plan_time: float = 0.0
     fallbacks: int = 0
+    outcomes: list = field(default_factory=list)  # the user's outcome history, in order (for model studies)
 
     def metrics(self, days: int) -> dict[str, float]:
         return {
@@ -242,14 +279,15 @@ def simulate(world: World, name: str, cfg: EvalConfig, seed: int) -> UserResult:
                 ti = p.tasks[i]
                 t = pending[ti.task.id]
                 res.planned += 1
+                ctx = block_context(p, i, s)
                 # Free early? People start the next planned task up to 30 minutes ahead of time.
                 start = max(p.slot_dt(s) - timedelta(minutes=EARLY_START_MIN), cursor)
-                if start >= day_end:  # the day ran out before this block could start
-                    history.append(Outcome(t.category, "skipped", int(ti.est)))
+                if start >= day_end:  # the day ran out before this block could start: censored, not a skip
+                    history.append(Outcome(t.category, "unreached", int(ti.est), context=ctx))
                     continue
                 fit = u.true_fit(base, start, t)
                 if _draw(seed, t.id, d, f"skip{k}").random() >= u.follow * (0.6 + 0.4 * fit):
-                    history.append(Outcome(t.category, "skipped", int(ti.est)))
+                    history.append(Outcome(t.category, "skipped", int(ti.est), context=ctx))
                     continue
                 for c in day_commits:  # starting inside a commitment means waiting it out
                     if c.start <= start < c.end:
@@ -268,7 +306,7 @@ def simulate(world: World, name: str, cfg: EvalConfig, seed: int) -> UserResult:
                     res.overload += spill
                     worked = max(0.0, actual - spill)
                     t.minutes_done = min(t.est_minutes - 5, t.minutes_done + int(worked))
-                    history.append(Outcome(t.category, "partial", int(ti.est), int(worked) or None))
+                    history.append(Outcome(t.category, "partial", int(ti.est), int(worked) or None, ctx))
                     cursor = day_end
                     continue
                 res.done += 1
@@ -276,7 +314,7 @@ def simulate(world: World, name: str, cfg: EvalConfig, seed: int) -> UserResult:
                 err = abs(predicted - actual)
                 res.abs_errors.append(err)
                 day_errors.append(err)
-                history.append(Outcome(t.category, "done", int(round(ti.est)), int(round(actual))))
+                history.append(Outcome(t.category, "done", int(round(ti.est)), int(round(actual)), ctx))
                 if t.deadline is not None:
                     res.due += 1
                     counted_due.add(t.id)
@@ -291,6 +329,7 @@ def simulate(world: World, name: str, cfg: EvalConfig, seed: int) -> UserResult:
                 res.due += 1
                 res.violations += 1
             del pending[tid]
+    res.outcomes = history
     return res
 
 
@@ -354,7 +393,7 @@ def paired_comparison(a: list[float], b: list[float], seed: int) -> dict:
 
 
 def scheduler_names(cfg: EvalConfig) -> list[str]:
-    names = ["priority", "duration", "fuzzy", "ga", "hybrid"]
+    names = ["priority", "duration", "energy", "ga", "hybrid"]
     if cfg.include_cpsat:
         from ..cpsat import available
 
@@ -364,6 +403,10 @@ def scheduler_names(cfg: EvalConfig) -> list[str]:
         names.append("ga_1day")
     if cfg.ablations:
         names += ABLATIONS
+    if cfg.selection:
+        names += SELECTION
+    if cfg.buffers:
+        names += BUFFERS
     return names
 
 
@@ -431,7 +474,8 @@ def run_experiment(cfg: EvalConfig, progress: Callable[[float], None] | None = N
     return {
         "config": {"users": cfg.users, "days": cfg.days, "horizon": cfg.horizon, "seed": cfg.seed,
                    "compare_horizon": cfg.compare_horizon, "difficulty": cfg.difficulty,
-                   "include_cpsat": cfg.include_cpsat and "cpsat" in names, "cpsat_seconds": cfg.cpsat_seconds, "ablations": cfg.ablations},
+                   "include_cpsat": cfg.include_cpsat and "cpsat" in names, "cpsat_seconds": cfg.cpsat_seconds, "ablations": cfg.ablations,
+                   "selection": cfg.selection, "buffers": cfg.buffers},
         "versions": {"circadia": VERSION, "duration_model": DEFAULT_VERSION,
                      "ga": {"population": EVAL_GA.population, "generations": EVAL_GA.generations,
                             "patience": EVAL_GA.patience},

@@ -5,7 +5,7 @@ isolates the planning idea being added at each step:
 
   1. priority_deadline  - sort by priority then deadline, earliest gap, user's own estimates
   2. duration_aware     - same, but with P80 durations from the probability model
-  3. fuzzy_greedy       - same order, but each task goes to the legal gap with the best energy fit
+  3. energy_greedy      - same order, but each task goes to the legal gap where it is most likely to happen
   4. (the full GA lives in ai.ga.runner)
 """
 from __future__ import annotations
@@ -31,8 +31,8 @@ def duration_aware(p: Problem) -> Decoded:
     return decode(p, _priority_order(p), np.zeros(n, dtype=np.int64))
 
 
-def fuzzy_greedy(p: Problem) -> Decoded:
-    """Place each task, in priority order, at the free start with the highest energy fit."""
+def energy_greedy(p: Problem) -> Decoded:
+    """Place each task, in priority order, at the free start where the completion model rates it most likely to happen."""
     n = len(p.tasks)
     lengths = [ti.slots_p80 for ti in p.tasks]
     starts = [-1] * n
@@ -70,5 +70,5 @@ def fuzzy_greedy(p: Problem) -> Decoded:
 BASELINES = {
     "priority_deadline": priority_deadline,
     "duration_aware": duration_aware,
-    "fuzzy_greedy": fuzzy_greedy,
+    "energy_greedy": energy_greedy,
 }

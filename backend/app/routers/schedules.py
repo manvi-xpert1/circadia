@@ -102,9 +102,13 @@ def record_outcome(bid: int, body: OutcomeIn, user: User = Depends(current_user)
     t = db.get(Task, b.task_id)
     expl = b.explanation_json or {}
     est = int(expl.get("est_minutes") or max(t.est_minutes - t.minutes_done, 5))
+    ctx = expl.get("context")
+    if not ctx or ctx.get("start") != b.start.isoformat():
+        ctx = None  # moved after planning: the saved context describes another time
     db.add(TaskOutcome(user_id=user.id, block_id=b.id, task_id=t.id, category=t.category, est_minutes=est,
                        planned_minutes=expl.get("planned_minutes"), status=body.status,
-                       actual_minutes=body.actual_minutes if body.status != "skipped" else None))
+                       actual_minutes=body.actual_minutes if body.status != "skipped" else None,
+                       context_json=ctx))
     if body.status == "done":
         t.status, t.completed_at = "done", datetime.now()
     elif body.status == "partial":

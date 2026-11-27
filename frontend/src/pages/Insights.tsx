@@ -90,7 +90,7 @@ export function InsightsPage() {
             <Card>
               <SectionTitle>Do well-fitting blocks get done more?</SectionTitle>
               {!d.by_fit.length ? <NotEnough need={1} have={0} what="outcomes on planned blocks" /> : (
-                <BarRates data={d.by_fit.map((x) => ({ name: x.label, rate: x.done_rate, n: x.n }))} xLabel="Energy fit of the block" />
+                <BarRates data={d.by_fit.map((x) => ({ name: x.label, rate: x.done_rate, n: x.n }))} xLabel="Predicted chance the block would happen" />
               )}
             </Card>
 
@@ -142,10 +142,52 @@ export function InsightsPage() {
                 </table>
               )}
             </Card>
+
+            <Calibration includeDemo={source !== "user"} />
           </div>
         </div>
       )}
     </>
+  );
+}
+
+interface PilotCalibration {
+  n: number; brier: number | null; enough_data: boolean; note: string;
+  bands: { band: string; n: number; predicted: number | null; observed: number | null }[];
+}
+
+/** Are the planner's "chance it happens" numbers honest? Predicted vs what you actually did. */
+function Calibration({ includeDemo }: { includeDemo: boolean }) {
+  const q = useQuery({
+    queryKey: ["pilot-calibration", includeDemo],
+    queryFn: () => api<{ calibration: PilotCalibration }>(`/api/data/pilot?include_demo=${includeDemo}`),
+  });
+  const c = q.data?.calibration;
+  return (
+    <Card>
+      <SectionTitle>Are the predictions honest?</SectionTitle>
+      {!c ? <Skeleton className="h-32" /> : c.n === 0 ? <NotEnough need={30} have={0} what="outcomes on blocks with a prediction" /> : (
+        <>
+          <table className="w-full text-[14px]">
+            <caption className="sr-only">Predicted chance a block happens against how often it did</caption>
+            <thead className="text-left text-[12.5px] text-muted"><tr><th className="py-1 font-medium">Predicted</th><th className="font-medium">Blocks</th><th className="font-medium">Average prediction</th><th className="font-medium">Actually happened</th></tr></thead>
+            <tbody className="divide-y divide-line">
+              {c.bands.map((b) => (
+                <tr key={b.band}>
+                  <td className="num py-1.5">{b.band}</td><td className="num">{b.n}</td>
+                  <td className="num">{b.predicted == null ? "–" : `${Math.round(b.predicted * 100)}%`}</td>
+                  <td className="num">{b.observed == null ? "–" : `${Math.round(b.observed * 100)}%`}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="hint mt-2">
+            {c.n} outcome{c.n === 1 ? "" : "s"}{c.brier != null ? `, Brier score ${c.brier.toFixed(3)} (0 is perfect, 0.25 is a coin flip)` : ""}.{" "}
+            {c.enough_data ? "Well-calibrated predictions have the last two columns close together." : c.note}
+          </p>
+        </>
+      )}
+    </Card>
   );
 }
 

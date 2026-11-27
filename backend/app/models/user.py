@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Optional
 
 from sqlalchemy import Float, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
@@ -39,3 +40,8 @@ class UserPreferences(Base):
     horizon_days: Mapped[int] = mapped_column(Integer, default=3)
     optimizer: Mapped[str] = mapped_column(String(10), default="hybrid")  # ga | hybrid | cpsat
     replan_stability: Mapped[float] = mapped_column(Float, default=0.5)  # 0 = free replan, 1 = keep the plan
+    simulation: Mapped[Optional[str]] = mapped_column(String(10), default="standard", nullable=True)  # Monte Carlo tier
+    # Quantile of the predicted duration each block reserves. P65 is the default because it
+    # finished more tasks than P80 in the closed-loop evaluation without significantly more
+    # overruns into commitments (docs/RESULTS.md, "Block length").
+    block_quantile: Mapped[Optional[float]] = mapped_column(Float, default=0.65, nullable=True)

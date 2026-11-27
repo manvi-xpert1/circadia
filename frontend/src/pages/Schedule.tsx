@@ -19,7 +19,7 @@ const shortDay = (date: string) => {
 const PART_LABELS: Record<string, { label: string; penalty?: boolean }> = {
   pri: { label: "Priority coverage" },
   dl: { label: "Deadline safety" },
-  en: { label: "Energy fit" },
+  en: { label: "Chance blocks happen" },
   dur: { label: "Realistic durations" },
   pref: { label: "Breaks and late work" },
   over: { label: "Overload", penalty: true },
@@ -169,14 +169,14 @@ export function SchedulePage() {
       {view === "day" && dayInfo ? (
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
           <Card className="p-4 sm:p-5">
-            <p className="mb-3 text-[12.5px] text-muted">The shaded strip shows your expected mental capacity; darker means sharper.</p>
+            <p className="mb-3 text-[12.5px] text-muted">The shaded strip shows your expected mental energy; darker means sharper.</p>
             <DayTimeline run={run} day={dayInfo} blocks={dayBlocks} selected={selected} onSelect={setSelected} />
           </Card>
           <div className="lg:sticky lg:top-6 lg:self-start">
             {sel ? <WhyPanel key={sel.block_id} block={sel} onClose={() => setSelected(null)} /> : (
               <div className="rounded-card border border-dashed border-line p-5 text-muted">
                 <p className="font-medium text-ink">Select a block to see why it is there</p>
-                <p className="mt-1 text-[13.5px]">You'll see the fuzzy rules that fired, the predicted duration, the chance it gets done and the rules that shaped its time.</p>
+                <p className="mt-1 text-[13.5px]">You'll see how likely it is to happen at that time and why, the predicted duration, and the rules that shaped its time.</p>
               </div>
             )}
           </div>
@@ -243,7 +243,7 @@ function Alternatives({ run, onUse }: { run: PlanRun; onUse: (vid: number) => vo
           </div>
           <dl className="mt-3 grid grid-cols-2 gap-y-1.5 text-[13.5px]">
             <dt className="text-muted">Tasks planned</dt><dd className="num text-right">{p.blocks.filter((b) => b.kind === "ai").length}</dd>
-            <dt className="text-muted">Average energy fit</dt><dd className="num text-right">{avgFit(p).toFixed(2)}</dd>
+            <dt className="text-muted">Average chance a block happens</dt><dd className="num text-right">{Math.round(avgFit(p) * 100)}%</dd>
             <dt className="text-muted">Busiest day</dt><dd className="num text-right">{Math.round(maxLoad(p) * 100)}%</dd>
             <dt className="text-muted">Not planned</dt><dd className="num text-right">{p.unscheduled.length}</dd>
             {p.robustness && <>
@@ -251,15 +251,15 @@ function Alternatives({ run, onUse }: { run: PlanRun; onUse: (vid: number) => vo
               <dt className="text-muted">Deadlines met</dt><dd className="num text-right">{pct(p.robustness.deadline_safety)}</dd>
             </>}
           </dl>
-          {p.tradeoffs && (
+          {p.tradeoffs && p.tradeoffs.best_at.length > 0 && (
             <div className="mt-3 flex flex-wrap gap-1.5">
-              {p.tradeoffs.pareto_optimal && <Badge tone="teal" title="No other plan is at least as good on every measure">Pareto-optimal</Badge>}
-              {p.tradeoffs.best_at.map((b) => <Badge key={b}>Best: {b}</Badge>)}
+              {p.tradeoffs.best_at.map((b) => <Badge key={b} tone="teal">Best for: {b.toLowerCase()}</Badge>)}
             </div>
           )}
           {p.tradeoffs && !p.tradeoffs.pareto_optimal && (
-            <p className="mt-2 rounded-md bg-warn-tint px-2 py-1 text-[12.5px] text-warn">
-              {p.tradeoffs.dominated_by.join(" and ")} {p.tradeoffs.dominated_by.length > 1 ? "are" : "is"} as good or better on every measure we track.
+            <p className="mt-2 rounded-md bg-warn-tint px-2 py-1 text-[12.5px] text-warn"
+              title="Dominated: another plan is at least as good on every measure and clearly better on one">
+              {p.tradeoffs.dominated_by.join(" and ")} {p.tradeoffs.dominated_by.length > 1 ? "do" : "does"} at least as well on everything, so there is little reason to pick this one.
             </p>
           )}
           {p.tradeoffs && p.version_id !== main.version_id && p.tradeoffs.gives_up_vs_main.length > 0 && (
@@ -267,7 +267,7 @@ function Alternatives({ run, onUse }: { run: PlanRun; onUse: (vid: number) => vo
           )}
           {p.version_id !== main.version_id && (
             <p className="mt-3 text-[12.5px] text-muted">
-              {p.preset === "deadline" ? "Weights deadline safety higher and energy fit lower." : p.preset === "gentle" ? "Penalises overload three times as much; plans lighter days." : "Weighs priority, deadlines and energy evenly."}
+              {p.preset === "deadline" ? "Safer deadlines: due work goes first, even at less ideal times." : p.preset === "gentle" ? "Lighter day: avoids packed days, even if fewer tasks fit." : "Most tasks done: weighs priority, deadlines and timing evenly."}
             </p>
           )}
           {p.version_id !== run.active_version_id && <Button className="mt-4 w-full" onClick={() => onUse(p.version_id)}>Use this plan</Button>}
@@ -280,11 +280,13 @@ function Alternatives({ run, onUse }: { run: PlanRun; onUse: (vid: number) => vo
 export function Risk({ plan, run }: { plan: PlanVersion; run: PlanRun }) {
   const r = plan.robustness;
   if (!r) return <EmptyState title="No simulation for this plan" body="Regenerate to see how the plan holds up when tasks run long or get skipped." />;
+  const pm = (v: number | null | undefined, se: number | null | undefined) => (v == null || se == null ? "" : ` (±${Math.round(1.96 * se * 100)} pts)`);
+  const sel = plan.selection;
   const rows: [string, string, string][] = [
-    ["Tasks finished", `${r.expected_completed.toFixed(1)} of ${r.planned}`, `Usually between ${r.completed_p10} and ${r.completed_p90}.`],
+    ["Tasks finished", `${r.expected_completed.toFixed(1)} of ${r.planned}`, `Usually between ${r.completed_p10} and ${r.completed_p90}.${r.se ? ` Estimate ±${(1.96 * r.se.expected_completed).toFixed(1)}.` : ""}`],
     ["All high-priority blocks done", pct(r.p_all_important_done),
       r.important_unplanned ? `${r.important_unplanned} high-priority task${r.important_unplanned > 1 ? "s are" : " is"} not in the plan at all.` : `${r.important_planned} High or Critical blocks planned.`],
-    ["Every planned deadline met", pct(r.p_all_deadlines_met), "Chance that no deadline is missed, counting knock-on delays."],
+    ["Every planned deadline met", pct(r.p_all_deadlines_met), `Chance that no deadline is missed, counting knock-on delays.${pm(r.p_all_deadlines_met, r.se?.p_all_deadlines_met)}`],
     ["Deadline work finished on time", pct(r.deadline_safety), "Share of tasks due in this horizon that finish before their deadline; unplanned ones count as late."],
     ["Work left over", `${Math.round(r.expected_unfinished_minutes)} min`, "Expected minutes skipped, or cut off at the end of the day."],
     ["A day runs past its end", pct(r.p_overrun_any_day), r.p_overrun_by_day.map((p, d) => `${d === 0 ? "today" : d === 1 ? "tomorrow" : shortDay(run.days[d]?.date ?? "")} ${pct(p)}`).join(" · ")],
@@ -296,7 +298,15 @@ export function Risk({ plan, run }: { plan: PlanVersion; run: PlanRun }) {
       <p className="hint mt-1">
         The plan was replayed {r.runs} times. Each time, durations were drawn from what you have taught the planner and some blocks were skipped
         at your usual rate. A block that runs long pushes the next one later. These are estimates, not guarantees.
+        {r.adaptive && ` The number of runs was chosen automatically (${r.stopped === "target" ? "it stopped once the estimate was precise" : "it reached the cap"}).`}
       </p>
+      {sel && (
+        <p className="mt-2 rounded-md bg-canvas px-3 py-2 text-[13px]">
+          {sel.switched
+            ? `Chosen from ${sel.candidates.length} candidate plans because it did clearly better in simulation (${sel.chosen}).`
+            : `${sel.candidates.length} candidate plans were simulated; none did clearly better than this one, so it was kept.`}
+        </p>
+      )}
       <dl className="mt-4 divide-y divide-line">
         {rows.map(([k, v, note]) => (
           <div key={k} className="grid gap-1 py-2.5 sm:grid-cols-[220px_90px_1fr] sm:items-baseline">

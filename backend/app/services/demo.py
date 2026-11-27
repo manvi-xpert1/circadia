@@ -17,7 +17,7 @@ DEMO = "demo"
 
 # title, category, priority, est, mental diff, physical diff, mental req, physical req, deadline (days, hour) or None
 DEMO_TASKS = [
-    ("Finish AI assignment: fuzzy logic section", "Study", 4, 120, 8, 2, 8, 2, (1, 17)),
+    ("Finish AI assignment: search algorithms section", "Study", 4, 120, 8, 2, 8, 2, (1, 17)),
     ("Revise DBMS unit 3 notes", "Study", 3, 90, 7, 2, 7, 2, (2, 9)),
     ("Lab record: write experiments 4-6", "Study", 3, 60, 5, 2, 5, 3, (1, 10)),
     ("Read paper on genetic algorithms", "Study", 2, 45, 6, 1, 6, 2, None),

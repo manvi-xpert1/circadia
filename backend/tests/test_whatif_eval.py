@@ -39,7 +39,7 @@ def test_urgent_task_is_placed_before_its_deadline():
 
 def test_lower_energy_lowers_capacity():
     out = simulate(base_req(), {"energy_delta": -4})
-    assert any("capacity" in line for line in out["explanation"])
+    assert any("mental energy" in line for line in out["explanation"])
 
 
 def test_extending_a_task_lengthens_its_block():
@@ -61,7 +61,7 @@ def test_small_experiment_is_complete_reproducible_and_legal():
     r1 = run_experiment(cfg)
     r2 = run_experiment(cfg)
     assert r1["summary"] == r2["summary"]
-    assert set(r1["summary"]) == {"priority", "duration", "fuzzy", "ga", "hybrid", "ga_1day"}  # hybrid added in v2.0
+    assert set(r1["summary"]) == {"priority", "duration", "energy", "ga", "hybrid", "ga_1day"}
     for name, metrics in r1["summary"].items():
         assert set(metrics) == set(METRICS)
         assert metrics["plan_violations"]["mean"] == 0, name  # every scheduler obeys the hard rules

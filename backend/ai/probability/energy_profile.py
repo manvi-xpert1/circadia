@@ -1,4 +1,4 @@
-"""Time-of-day energy profile (design section 3.3a, Step 0).
+"""Time-of-day energy profile: projects a check-in to every slot of the day.
 
 A check-in is one reading at one moment. To estimate energy in other slots
 we add a time-of-day offset. Defaults are a generic assumption; once the user

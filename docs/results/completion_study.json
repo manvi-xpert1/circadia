@@ -1,0 +1,226 @@
+{
+ "config": {
+  "users": 12,
+  "days": 10,
+  "seed": 2026
+ },
+ "labels": {
+  "constant": "Constant rate",
+  "category": "Category follow-through",
+  "contextual": "Contextual model",
+  "contextual_flat": "Contextual, flat prior"
+ },
+ "overall": {
+  "constant": {
+   "n": 544,
+   "brier": 0.1342,
+   "log_loss": 0.4374,
+   "ece": 0.051,
+   "auc": 0.57,
+   "mean_predicted": 0.827,
+   "observed_rate": 0.844
+  },
+  "category": {
+   "n": 544,
+   "brier": 0.134,
+   "log_loss": 0.4374,
+   "ece": 0.0376,
+   "auc": 0.584,
+   "mean_predicted": 0.811,
+   "observed_rate": 0.844
+  },
+  "contextual": {
+   "n": 544,
+   "brier": 0.1293,
+   "log_loss": 0.4209,
+   "ece": 0.0826,
+   "auc": 0.697,
+   "mean_predicted": 0.764,
+   "observed_rate": 0.844
+  },
+  "contextual_flat": {
+   "n": 544,
+   "brier": 0.1312,
+   "log_loss": 0.4272,
+   "ece": 0.064,
+   "auc": 0.654,
+   "mean_predicted": 0.78,
+   "observed_rate": 0.844
+  }
+ },
+ "by_history": {
+  "0-9": {
+   "constant": {
+    "n": 120,
+    "brier": 0.1323,
+    "log_loss": 0.422,
+    "ece": 0.0745,
+    "auc": 0.685,
+    "mean_predicted": 0.804,
+    "observed_rate": 0.833
+   },
+   "category": {
+    "n": 120,
+    "brier": 0.1374,
+    "log_loss": 0.4441,
+    "ece": 0.0544,
+    "auc": 0.64,
+    "mean_predicted": 0.789,
+    "observed_rate": 0.833
+   },
+   "contextual": {
+    "n": 120,
+    "brier": 0.1393,
+    "log_loss": 0.445,
+    "ece": 0.1284,
+    "auc": 0.775,
+    "mean_predicted": 0.705,
+    "observed_rate": 0.833
+   },
+   "contextual_flat": {
+    "n": 120,
+    "brier": 0.1359,
+    "log_loss": 0.4387,
+    "ece": 0.0878,
+    "auc": 0.708,
+    "mean_predicted": 0.746,
+    "observed_rate": 0.833
+   }
+  },
+  "10-29": {
+   "constant": {
+    "n": 240,
+    "brier": 0.1265,
+    "log_loss": 0.4235,
+    "ece": 0.0682,
+    "auc": 0.535,
+    "mean_predicted": 0.829,
+    "observed_rate": 0.863
+   },
+   "category": {
+    "n": 240,
+    "brier": 0.1248,
+    "log_loss": 0.4146,
+    "ece": 0.0517,
+    "auc": 0.565,
+    "mean_predicted": 0.812,
+    "observed_rate": 0.863
+   },
+   "contextual": {
+    "n": 240,
+    "brier": 0.1207,
+    "log_loss": 0.4001,
+    "ece": 0.0876,
+    "auc": 0.689,
+    "mean_predicted": 0.775,
+    "observed_rate": 0.863
+   },
+   "contextual_flat": {
+    "n": 240,
+    "brier": 0.1245,
+    "log_loss": 0.4129,
+    "ece": 0.0778,
+    "auc": 0.617,
+    "mean_predicted": 0.785,
+    "observed_rate": 0.863
+   }
+  },
+  "30+": {
+   "constant": {
+    "n": 184,
+    "brier": 0.1454,
+    "log_loss": 0.4656,
+    "ece": 0.0475,
+    "auc": 0.521,
+    "mean_predicted": 0.839,
+    "observed_rate": 0.826
+   },
+   "category": {
+    "n": 184,
+    "brier": 0.1438,
+    "log_loss": 0.4628,
+    "ece": 0.03,
+    "auc": 0.591,
+    "mean_predicted": 0.823,
+    "observed_rate": 0.826
+   },
+   "contextual": {
+    "n": 184,
+    "brier": 0.1339,
+    "log_loss": 0.4323,
+    "ece": 0.0756,
+    "auc": 0.679,
+    "mean_predicted": 0.788,
+    "observed_rate": 0.826
+   },
+   "contextual_flat": {
+    "n": 184,
+    "brier": 0.1367,
+    "log_loss": 0.4383,
+    "ece": 0.0495,
+    "auc": 0.664,
+    "mean_predicted": 0.796,
+    "observed_rate": 0.826
+   }
+  }
+ },
+ "reliability": {
+  "category": [
+   {
+    "bin": "0.4-0.6",
+    "n": 16,
+    "predicted": 0.559,
+    "observed": 0.75
+   },
+   {
+    "bin": "0.6-0.8",
+    "n": 151,
+    "predicted": 0.72,
+    "observed": 0.801
+   },
+   {
+    "bin": "0.8-1.0",
+    "n": 377,
+    "predicted": 0.858,
+    "observed": 0.865
+   }
+  ],
+  "contextual": [
+   {
+    "bin": "0.2-0.4",
+    "n": 11,
+    "predicted": 0.344,
+    "observed": 0.636
+   },
+   {
+    "bin": "0.4-0.6",
+    "n": 59,
+    "predicted": 0.523,
+    "observed": 0.61
+   },
+   {
+    "bin": "0.6-0.8",
+    "n": 195,
+    "predicted": 0.716,
+    "observed": 0.841
+   },
+   {
+    "bin": "0.8-1.0",
+    "n": 279,
+    "predicted": 0.865,
+    "observed": 0.903
+   }
+  ]
+ },
+ "brier_difference": {
+  "mean": -0.0046,
+  "ci": [
+   -0.0094,
+   -0.0006
+  ],
+  "p": 0.0923,
+  "users_better": 7,
+  "meaning": "contextual minus category, per user; negative favours the contextual model"
+ },
+ "data": "synthetic"
+}
